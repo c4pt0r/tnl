@@ -2,6 +2,10 @@ name = "tnl"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+# Optional: Set custom public URL (defaults to worker hostname)
+# [vars]
+# PUBLIC_URL = "https://tnl.your-domain.com"
+
 [durable_objects]
 bindings = [
   { name = "SHARES", class_name = "ShareDO" }

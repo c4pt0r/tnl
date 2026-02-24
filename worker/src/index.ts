@@ -7,6 +7,7 @@
 
 interface Env {
   SHARES: DurableObjectNamespace;
+  PUBLIC_URL?: string;  // e.g., "https://tnl.example.workers.dev"
 }
 
 // Generate random share code
@@ -43,15 +44,19 @@ async function handleWebSocket(request: Request, env: Env, url: URL): Promise<Re
   const code = url.searchParams.get('code');
   const isSharer = url.pathname === '/ws/share' || !code;
   
+  // Get public URL from env or derive from request
+  const publicUrl = env.PUBLIC_URL || `https://${url.hostname}`;
+  
   if (isSharer) {
     // Sharer: generate a new code and create DO with that code as ID
     const shareCode = generateCode();
     const id = env.SHARES.idFromName(shareCode);
     const stub = env.SHARES.get(id);
     
-    // Pass the share code to the DO
+    // Pass the share code and public URL to the DO
     const newUrl = new URL(request.url);
     newUrl.searchParams.set('newShareCode', shareCode);
+    newUrl.searchParams.set('publicUrl', publicUrl);
     return stub.fetch(new Request(newUrl, request));
   } else {
     // Accessor: lookup DO by share code
@@ -67,6 +72,7 @@ export class ShareDO {
   sharerWs: WebSocket | null = null;
   accessorWs: Map<string, WebSocket> = new Map();
   shareCode: string | null = null;
+  publicUrl: string = '';
   mode: string = 'ro';
   pendingRequests: Map<string, WebSocket> = new Map();
   
@@ -78,6 +84,7 @@ export class ShareDO {
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
     const newShareCode = url.searchParams.get('newShareCode');
+    const publicUrl = url.searchParams.get('publicUrl') || `https://${url.hostname}`;
     
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -85,6 +92,7 @@ export class ShareDO {
     if (newShareCode) {
       // This is a sharer registering
       this.shareCode = newShareCode;
+      this.publicUrl = publicUrl;
       this.handleSharer(server);
     } else if (code) {
       // This is an accessor connecting
@@ -114,7 +122,7 @@ export class ShareDO {
           ws.send(JSON.stringify({
             op: 'registered',
             shareCode: this.shareCode,
-            publicUrl: `https://tnl.YOUR_ACCOUNT.workers.dev/?code=${this.shareCode}`,
+            publicUrl: `${this.publicUrl}/?code=${this.shareCode}`,
           }));
         } else if (msg.op === 'result' || msg.op === 'error' || msg.op === 'chunk') {
           // Response from sharer, forward to accessor
