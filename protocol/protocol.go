@@ -12,6 +12,8 @@ const (
 	OpCopy   = "cp"
 	OpRemove = "rm"
 	OpStat   = "stat"
+	OpGlob   = "glob"
+	OpGrep   = "grep"
 
 	// Responses
 	OpResult = "result"
@@ -86,4 +88,21 @@ type TreeEntry struct {
 // TreeResult for recursive ls
 type TreeResult struct {
 	Entries []TreeEntry `json:"entries"`
+}
+
+// GlobResult for glob matches
+type GlobResult struct {
+	Matches []string `json:"matches"`
+}
+
+// GrepMatch for grep results
+type GrepMatch struct {
+	Path    string `json:"path"`
+	Line    int    `json:"line"`
+	Content string `json:"content"`
+}
+
+// GrepResult for grep matches
+type GrepResult struct {
+	Matches []GrepMatch `json:"matches"`
 }

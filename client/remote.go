@@ -404,6 +404,69 @@ func (c *RemoteClient) Remove(path string) error {
 	return nil
 }
 
+func (c *RemoteClient) Glob(pattern string) ([]string, error) {
+	reqID := uuid.New().String()
+
+	err := c.conn.WriteJSON(protocol.Message{
+		Op:    protocol.OpGlob,
+		ReqID: reqID,
+		Path:  pattern,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Op    string              `json:"op"`
+		ReqID string              `json:"reqId"`
+		Data  protocol.GlobResult `json:"data"`
+		Error string              `json:"error"`
+	}
+
+	if err := c.conn.ReadJSON(&resp); err != nil {
+		return nil, err
+	}
+
+	if resp.Op == protocol.OpError {
+		return nil, fmt.Errorf(resp.Error)
+	}
+
+	return resp.Data.Matches, nil
+}
+
+func (c *RemoteClient) Grep(pattern, path string) ([]protocol.GrepMatch, error) {
+	reqID := uuid.New().String()
+
+	err := c.conn.WriteJSON(map[string]any{
+		"op":    protocol.OpGrep,
+		"reqId": reqID,
+		"data": map[string]any{
+			"pattern": pattern,
+			"path":    path,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Op    string              `json:"op"`
+		ReqID string              `json:"reqId"`
+		Data  protocol.GrepResult `json:"data"`
+		Error string              `json:"error"`
+	}
+
+	if err := c.conn.ReadJSON(&resp); err != nil {
+		return nil, err
+	}
+
+	if resp.Op == protocol.OpError {
+		return nil, fmt.Errorf(resp.Error)
+	}
+
+	return resp.Data.Matches, nil
+}
+
 func (c *RemoteClient) Close() error {
 	return c.conn.Close()
 }

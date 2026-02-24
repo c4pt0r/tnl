@@ -129,6 +129,36 @@ Configure worker URL via:
 	}
 	rootCmd.AddCommand(treeCmd)
 
+	// glob command
+	globCmd := &cobra.Command{
+		Use:   "glob <shareCode:pattern>",
+		Short: "Find files matching glob pattern",
+		Long: `Find files matching a glob pattern.
+
+Examples:
+  tnl glob ABC123:/*.txt         # all .txt in root
+  tnl glob ABC123:/**/*.go       # all .go files recursively
+  tnl glob ABC123:/src/*.{js,ts} # .js and .ts in src`,
+		Args: cobra.ExactArgs(1),
+		Run:  runGlob,
+	}
+	rootCmd.AddCommand(globCmd)
+
+	// grep command
+	grepCmd := &cobra.Command{
+		Use:   "grep <pattern> <shareCode:path>",
+		Short: "Search for pattern in files",
+		Long: `Search for regex pattern in files.
+
+Examples:
+  tnl grep "TODO" ABC123:/           # search all files
+  tnl grep "func.*Error" ABC123:/src # search in src/
+  tnl grep "import" ABC123:/**.go    # (path is starting dir)`,
+		Args: cobra.ExactArgs(2),
+		Run:  runGrep,
+	}
+	rootCmd.AddCommand(grepCmd)
+
 	// init command - setup config
 	initCmd := &cobra.Command{
 		Use:   "init <worker-url>",
@@ -371,6 +401,67 @@ func runRemove(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("Removed %s\n", path)
+}
+
+func runGlob(cmd *cobra.Command, args []string) {
+	shareCode, pattern, err := client.ParseRemotePath(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	c, err := client.NewRemoteClient(workerURL, shareCode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer c.Close()
+
+	matches, err := c.Glob(pattern)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	for _, m := range matches {
+		fmt.Println(m)
+	}
+	
+	if len(matches) == 0 {
+		fmt.Fprintln(os.Stderr, "No matches found")
+	}
+}
+
+func runGrep(cmd *cobra.Command, args []string) {
+	pattern := args[0]
+	shareCode, path, err := client.ParseRemotePath(args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	c, err := client.NewRemoteClient(workerURL, shareCode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer c.Close()
+
+	matches, err := c.Grep(pattern, path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	for _, m := range matches {
+		fmt.Printf("\033[35m%s\033[0m:\033[32m%d\033[0m:%s\n", m.Path, m.Line, m.Content)
+	}
+	
+	if len(matches) == 0 {
+		fmt.Fprintln(os.Stderr, "No matches found")
+	} else {
+		fmt.Fprintf(os.Stderr, "\n%d matches found\n", len(matches))
+	}
 }
 
 func formatSize(bytes int64) string {
