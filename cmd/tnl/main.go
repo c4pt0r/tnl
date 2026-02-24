@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,10 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	defaultWorkerURL = "wss://tnl.YOUR_ACCOUNT.workers.dev/ws"
-)
-
 var (
 	workerURL string
 	mode      string
@@ -22,13 +19,57 @@ var (
 	progress  bool
 )
 
+// Config file structure
+type Config struct {
+	WorkerURL string `json:"worker_url"`
+}
+
+// getDefaultWorkerURL returns worker URL from env, config file, or empty string
+func getDefaultWorkerURL() string {
+	// 1. Environment variable takes priority
+	if url := os.Getenv("TNL_WORKER_URL"); url != "" {
+		return url
+	}
+
+	// 2. Try config file
+	configPaths := []string{
+		filepath.Join(os.Getenv("HOME"), ".tnl", "config.json"),
+		filepath.Join(os.Getenv("HOME"), ".config", "tnl", "config.json"),
+	}
+
+	for _, path := range configPaths {
+		if data, err := os.ReadFile(path); err == nil {
+			var cfg Config
+			if json.Unmarshal(data, &cfg) == nil && cfg.WorkerURL != "" {
+				return cfg.WorkerURL
+			}
+		}
+	}
+
+	// 3. No default - must be configured
+	return ""
+}
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "tnl",
 		Short: "Tunnel-based file sharing tool",
+		Long: `Tunnel-based ephemeral file sharing tool.
+
+Configure worker URL via:
+  1. Command line: --worker wss://your-worker.workers.dev/ws
+  2. Environment:  export TNL_WORKER_URL=wss://...
+  3. Config file:  ~/.tnl/config.json or ~/.config/tnl/config.json
+     {"worker_url": "wss://your-worker.workers.dev/ws"}`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if workerURL == "" {
+				return fmt.Errorf("worker URL not configured.\n\nSet via:\n  --worker wss://...\n  TNL_WORKER_URL=wss://...\n  ~/.tnl/config.json")
+			}
+			return nil
+		},
 	}
 
-	rootCmd.PersistentFlags().StringVar(&workerURL, "worker", defaultWorkerURL, "Worker WebSocket URL")
+	rootCmd.PersistentFlags().StringVar(&workerURL, "worker", getDefaultWorkerURL(), "Worker WebSocket URL")
 	rootCmd.PersistentFlags().BoolVarP(&progress, "progress", "p", true, "Show progress bar")
 
 	// share command
@@ -86,6 +127,38 @@ func main() {
 		Run:   runTree,
 	}
 	rootCmd.AddCommand(treeCmd)
+
+	// init command - setup config
+	initCmd := &cobra.Command{
+		Use:   "init <worker-url>",
+		Short: "Initialize config with worker URL",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configDir := filepath.Join(os.Getenv("HOME"), ".tnl")
+			if err := os.MkdirAll(configDir, 0755); err != nil {
+				return err
+			}
+
+			cfg := Config{WorkerURL: args[0]}
+			data, _ := json.MarshalIndent(cfg, "", "  ")
+
+			configPath := filepath.Join(configDir, "config.json")
+			if err := os.WriteFile(configPath, data, 0644); err != nil {
+				return err
+			}
+
+			fmt.Printf("Config saved to %s\n", configPath)
+			return nil
+		},
+	}
+	initCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		fmt.Println("Initialize tnl config with your worker URL.\n")
+		fmt.Println("Usage:")
+		fmt.Println("  tnl init wss://tnl.your-account.workers.dev/ws")
+	})
+	// Skip PersistentPreRunE for init command
+	initCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error { return nil }
+	rootCmd.AddCommand(initCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
