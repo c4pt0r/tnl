@@ -2,9 +2,6 @@
 /tnl
 *.exe
 
-# Go
-go.sum
-
 # Node
 node_modules/
 worker/node_modules/
