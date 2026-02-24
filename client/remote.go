@@ -434,15 +434,19 @@ func (c *RemoteClient) Glob(pattern string) ([]string, error) {
 	return resp.Data.Matches, nil
 }
 
-func (c *RemoteClient) Grep(pattern, path string) ([]protocol.GrepMatch, error) {
+func (c *RemoteClient) Grep(pattern, path string, opts protocol.GrepOptions) (*protocol.GrepResult, error) {
 	reqID := uuid.New().String()
 
 	err := c.conn.WriteJSON(map[string]any{
 		"op":    protocol.OpGrep,
 		"reqId": reqID,
 		"data": map[string]any{
-			"pattern": pattern,
-			"path":    path,
+			"pattern":    pattern,
+			"path":       path,
+			"ignoreCase": opts.IgnoreCase,
+			"filesOnly":  opts.FilesOnly,
+			"countOnly":  opts.CountOnly,
+			"wordMatch":  opts.WordMatch,
 		},
 	})
 	if err != nil {
@@ -464,7 +468,7 @@ func (c *RemoteClient) Grep(pattern, path string) ([]protocol.GrepMatch, error) 
 		return nil, fmt.Errorf(resp.Error)
 	}
 
-	return resp.Data.Matches, nil
+	return &resp.Data, nil
 }
 
 func (c *RemoteClient) Close() error {

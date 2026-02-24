@@ -104,5 +104,15 @@ type GrepMatch struct {
 
 // GrepResult for grep matches
 type GrepResult struct {
-	Matches []GrepMatch `json:"matches"`
+	Matches []GrepMatch       `json:"matches"`
+	Counts  map[string]int    `json:"counts,omitempty"`  // file -> count (for -c)
+	Files   []string          `json:"files,omitempty"`   // files with matches (for -l)
+}
+
+// GrepOptions for grep flags
+type GrepOptions struct {
+	IgnoreCase bool `json:"ignoreCase"`
+	FilesOnly  bool `json:"filesOnly"`
+	CountOnly  bool `json:"countOnly"`
+	WordMatch  bool `json:"wordMatch"`
 }

@@ -337,8 +337,21 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 	
 	pattern, _ := data["pattern"].(string)
 	path, _ := data["path"].(string)
+	ignoreCase, _ := data["ignoreCase"].(bool)
+	filesOnly, _ := data["filesOnly"].(bool)
+	countOnly, _ := data["countOnly"].(bool)
+	wordMatch, _ := data["wordMatch"].(bool)
+	
 	if path == "" {
 		path = "/"
+	}
+	
+	// Build regex pattern
+	if wordMatch {
+		pattern = `\b` + pattern + `\b`
+	}
+	if ignoreCase {
+		pattern = "(?i)" + pattern
 	}
 	
 	// Compile regex
@@ -350,6 +363,8 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 	
 	fullPath := c.resolvePath(path)
 	var matches []protocol.GrepMatch
+	counts := make(map[string]int)
+	filesWithMatches := make(map[string]bool)
 	
 	// Walk through files
 	filepath.Walk(fullPath, func(fpath string, info os.FileInfo, err error) error {
@@ -369,28 +384,57 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 		defer file.Close()
 		
 		relPath, _ := filepath.Rel(c.rootPath, fpath)
+		relPath = "/" + relPath
 		scanner := bufio.NewScanner(file)
 		lineNum := 0
+		fileMatchCount := 0
 		
 		for scanner.Scan() {
 			lineNum++
 			line := scanner.Text()
 			if re.MatchString(line) {
-				matches = append(matches, protocol.GrepMatch{
-					Path:    "/" + relPath,
-					Line:    lineNum,
-					Content: truncate(line, 200),
-				})
-				// Limit matches per file
-				if len(matches) > 1000 {
-					return filepath.SkipAll
+				fileMatchCount++
+				filesWithMatches[relPath] = true
+				
+				// Only collect full matches if not in filesOnly/countOnly mode
+				if !filesOnly && !countOnly {
+					matches = append(matches, protocol.GrepMatch{
+						Path:    relPath,
+						Line:    lineNum,
+						Content: truncate(line, 200),
+					})
+					// Limit matches
+					if len(matches) > 1000 {
+						return filepath.SkipAll
+					}
+				}
+				
+				// For filesOnly, one match is enough
+				if filesOnly {
+					return nil
 				}
 			}
+		}
+		
+		if fileMatchCount > 0 {
+			counts[relPath] = fileMatchCount
 		}
 		return nil
 	})
 	
-	c.sendResult(msg.ReqID, protocol.GrepResult{Matches: matches})
+	// Build result based on mode
+	result := protocol.GrepResult{}
+	if filesOnly {
+		for f := range filesWithMatches {
+			result.Files = append(result.Files, f)
+		}
+	} else if countOnly {
+		result.Counts = counts
+	} else {
+		result.Matches = matches
+	}
+	
+	c.sendResult(msg.ReqID, result)
 }
 
 func isBinaryFile(path string) bool {

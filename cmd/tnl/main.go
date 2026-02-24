@@ -10,14 +10,19 @@ import (
 	"time"
 
 	"github.com/c4pt0r/tnl/client"
+	"github.com/c4pt0r/tnl/protocol"
 	"github.com/spf13/cobra"
 )
 
 var (
-	workerURL string
-	mode      string
-	recursive bool
-	progress  bool
+	workerURL  string
+	mode       string
+	recursive  bool
+	progress   bool
+	ignoreCase bool
+	filesOnly  bool
+	countOnly  bool
+	wordMatch  bool
 )
 
 // Config file structure
@@ -151,12 +156,18 @@ Examples:
 		Long: `Search for regex pattern in files.
 
 Examples:
-  tnl grep "TODO" ABC123:/           # search all files
-  tnl grep "func.*Error" ABC123:/src # search in src/
-  tnl grep "import" ABC123:/**.go    # (path is starting dir)`,
+  tnl grep "TODO" ABC123:/             # search all files
+  tnl grep -i "error" ABC123:/         # case insensitive
+  tnl grep -l "import" ABC123:/        # only show filenames
+  tnl grep -c "func" ABC123:/src       # count matches per file
+  tnl grep -w "main" ABC123:/          # whole word match`,
 		Args: cobra.ExactArgs(2),
 		Run:  runGrep,
 	}
+	grepCmd.Flags().BoolVarP(&ignoreCase, "ignore-case", "i", false, "Case insensitive matching")
+	grepCmd.Flags().BoolVarP(&filesOnly, "files-with-matches", "l", false, "Only show filenames")
+	grepCmd.Flags().BoolVarP(&countOnly, "count", "c", false, "Only show match count per file")
+	grepCmd.Flags().BoolVarP(&wordMatch, "word-regexp", "w", false, "Match whole words only")
 	rootCmd.AddCommand(grepCmd)
 
 	// init command - setup config
@@ -447,20 +458,48 @@ func runGrep(cmd *cobra.Command, args []string) {
 	}
 	defer c.Close()
 
-	matches, err := c.Grep(pattern, path)
+	opts := protocol.GrepOptions{
+		IgnoreCase: ignoreCase,
+		FilesOnly:  filesOnly,
+		CountOnly:  countOnly,
+		WordMatch:  wordMatch,
+	}
+
+	result, err := c.Grep(pattern, path, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	for _, m := range matches {
-		fmt.Printf("\033[35m%s\033[0m:\033[32m%d\033[0m:%s\n", m.Path, m.Line, m.Content)
-	}
-	
-	if len(matches) == 0 {
-		fmt.Fprintln(os.Stderr, "No matches found")
+	// Display based on mode
+	if filesOnly {
+		if len(result.Files) == 0 {
+			fmt.Fprintln(os.Stderr, "No matches found")
+		} else {
+			for _, f := range result.Files {
+				fmt.Println(f)
+			}
+		}
+	} else if countOnly {
+		total := 0
+		for file, count := range result.Counts {
+			fmt.Printf("%s:%d\n", file, count)
+			total += count
+		}
+		if total == 0 {
+			fmt.Fprintln(os.Stderr, "No matches found")
+		} else {
+			fmt.Fprintf(os.Stderr, "\nTotal: %d matches in %d files\n", total, len(result.Counts))
+		}
 	} else {
-		fmt.Fprintf(os.Stderr, "\n%d matches found\n", len(matches))
+		for _, m := range result.Matches {
+			fmt.Printf("\033[35m%s\033[0m:\033[32m%d\033[0m:%s\n", m.Path, m.Line, m.Content)
+		}
+		if len(result.Matches) == 0 {
+			fmt.Fprintln(os.Stderr, "No matches found")
+		} else {
+			fmt.Fprintf(os.Stderr, "\n%d matches found\n", len(result.Matches))
+		}
 	}
 }
 
