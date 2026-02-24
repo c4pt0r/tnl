@@ -34,14 +34,32 @@ function renderHTML(code: string, path: string, files: any[] | null, error: stri
   if (error) {
     contentHTML = `<div class="error">❌ ${error}</div>`;
   } else if (fileContent !== null) {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+    const langMap: {[key: string]: string} = {
+      'js': 'javascript', 'ts': 'typescript', 'jsx': 'javascript', 'tsx': 'typescript',
+      'py': 'python', 'go': 'go', 'rs': 'rust', 'rb': 'ruby',
+      'java': 'java', 'c': 'c', 'cpp': 'cpp', 'h': 'c', 'hpp': 'cpp',
+      'sh': 'bash', 'bash': 'bash', 'zsh': 'bash',
+      'json': 'json', 'yaml': 'yaml', 'yml': 'yaml', 'toml': 'toml',
+      'xml': 'xml', 'html': 'html', 'css': 'css', 'scss': 'scss',
+      'md': 'markdown', 'sql': 'sql', 'dockerfile': 'dockerfile',
+    };
+    const lang = langMap[ext] || 'plaintext';
+    
     contentHTML = `
       <div class="file-view">
         <div class="file-header">
           <span>📄 ${fileName}</span>
-          <a href="/?code=${code}&path=${encodeURIComponent(path)}&download=1" class="btn">⬇️ Download</a>
+          <div>
+            <a href="/?code=${code}&path=${encodeURIComponent(path)}&raw=1" class="btn btn-secondary">Raw</a>
+            <a href="/?code=${code}&path=${encodeURIComponent(path)}&download=1" class="btn">⬇️ Download</a>
+          </div>
         </div>
-        <pre>${escapeHtml(fileContent)}</pre>
-      </div>`;
+        <pre><code class="language-${lang}">${escapeHtml(fileContent)}</code></pre>
+      </div>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script>`;
   } else if (files) {
     contentHTML = `<table>
       <tr><th>Name</th><th>Size</th><th>Modified</th></tr>`;
@@ -127,13 +145,25 @@ function renderHTML(code: string, path: string, files: any[] | null, error: stri
     }
     .file-view pre {
       margin: 0;
-      padding: 15px;
+      padding: 0;
       overflow-x: auto;
       font-size: 13px;
-      line-height: 1.5;
-      max-height: 70vh;
+      line-height: 1.6;
+      max-height: 75vh;
       overflow-y: auto;
     }
+    .file-view pre code {
+      display: block;
+      padding: 15px;
+    }
+    .file-view pre code.hljs {
+      background: #f8f9fa;
+    }
+    .btn-secondary {
+      background: #6c757d;
+      margin-right: 8px;
+    }
+    .btn-secondary:hover { background: #545b62; }
     .btn {
       background: #0066cc;
       color: white;
@@ -246,6 +276,7 @@ export default {
 async function handleWebUI(request: Request, env: Env, url: URL, code: string): Promise<Response> {
   const path = url.searchParams.get('path') || '/';
   const download = url.searchParams.get('download') === '1';
+  const raw = url.searchParams.get('raw') === '1';
   
   // Connect to DO
   const id = env.SHARES.idFromName(code);
@@ -253,7 +284,7 @@ async function handleWebUI(request: Request, env: Env, url: URL, code: string): 
   
   // Create a one-shot WebSocket connection to query files
   try {
-    const result = await stub.fetch(new Request(`http://internal/?code=${code}&webui=1&path=${encodeURIComponent(path)}&download=${download ? '1' : '0'}`));
+    const result = await stub.fetch(new Request(`http://internal/?code=${code}&webui=1&path=${encodeURIComponent(path)}&download=${download ? '1' : '0'}&raw=${raw ? '1' : '0'}`));
     
     if (result.headers.get('X-File-Download')) {
       return result; // Pass through file download
@@ -356,6 +387,7 @@ export class ShareDO {
   async handleWebUIRequest(url: URL): Promise<Response> {
     const path = url.searchParams.get('path') || '/';
     const download = url.searchParams.get('download') === '1';
+    const raw = url.searchParams.get('raw') === '1';
     
     if (!this.sharerWs || this.sharerWs.readyState !== WebSocket.OPEN) {
       return Response.json({ error: 'Share not available' });
@@ -379,8 +411,8 @@ export class ShareDO {
       return Response.json({ files: listResult.data.files });
     } else {
       // It's a file
-      if (download) {
-        // Stream file download
+      if (download || raw) {
+        // Stream file download or raw view
         const readResult = await this.sendRequest(reqId, { op: 'cat', reqId, path, compress: false });
         if (readResult.error) {
           return Response.json({ error: readResult.error });
@@ -388,6 +420,19 @@ export class ShareDO {
         
         const content = this.base64ToArrayBuffer(readResult.content);
         const fileName = path.split('/').pop() || 'file';
+        
+        if (raw) {
+          // Raw text view
+          const ext = fileName.split('.').pop()?.toLowerCase() || '';
+          const textExts = ['txt', 'md', 'json', 'yaml', 'yml', 'toml', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'rb', 'java', 'c', 'cpp', 'h', 'hpp', 'sh', 'bash', 'sql', 'log', 'conf', 'cfg', 'ini', 'env'];
+          const contentType = textExts.includes(ext) ? 'text/plain; charset=utf-8' : 'application/octet-stream';
+          return new Response(content, {
+            headers: {
+              'Content-Type': contentType,
+              'X-File-Download': '1',
+            },
+          });
+        }
         
         return new Response(content, {
           headers: {
