@@ -128,13 +128,21 @@ npx wrangler deploy
 
 ### 2. Install CLI (Client)
 
-#### Option A: Go Install
+#### Option A: Quick Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+```
+
+This auto-detects your OS/architecture and installs the latest release.
+
+#### Option B: Go Install
 
 ```bash
 go install github.com/c4pt0r/tnl/cmd/tnl@latest
 ```
 
-#### Option B: Build from Source
+#### Option C: Build from Source
 
 ```bash
 git clone https://github.com/c4pt0r/tnl.git
@@ -143,7 +151,7 @@ go build -o tnl ./cmd/tnl
 sudo mv tnl /usr/local/bin/
 ```
 
-#### Option C: Download Binary
+#### Option D: Download Binary
 
 Check [Releases](https://github.com/c4pt0r/tnl/releases) for pre-built binaries.
 
