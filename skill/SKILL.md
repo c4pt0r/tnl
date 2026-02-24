@@ -10,14 +10,8 @@ Ephemeral file sharing via WebSocket tunnels. Share files from CLI, access via w
 ## Quick Install (CLI only)
 
 ```bash
-# Detect OS/arch and install
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-[[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
-[[ "$ARCH" == "aarch64" ]] && ARCH="arm64"
-
-curl -sL "https://github.com/c4pt0r/tnl/releases/latest/download/tnl-${OS}-${ARCH}.tar.gz" | tar xz
-sudo mv tnl-* /usr/local/bin/tnl
+# One-line install
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
 
 # Configure server (use public server or user's own)
 tnl init wss://tnl.dongxuhuang.workers.dev/ws
