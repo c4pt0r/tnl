@@ -122,10 +122,18 @@ Configure worker URL via:
 	// rm command
 	rmCmd := &cobra.Command{
 		Use:   "rm <shareCode:path>",
-		Short: "Remove remote file (requires rw mode)",
-		Args:  cobra.ExactArgs(1),
-		Run:   runRemove,
+		Short: "Remove remote file or directory (requires rw mode)",
+		Long: `Remove remote file or directory.
+
+Examples:
+  tnl rm ABC123:/file.txt     # remove file
+  tnl rm -r ABC123:/dir       # remove directory recursively
+  
+Note: Requires share to be started with --mode=rw`,
+		Args: cobra.ExactArgs(1),
+		Run:  runRemove,
 	}
+	rmCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Remove directories recursively")
 	rootCmd.AddCommand(rmCmd)
 
 	// tree command
@@ -412,12 +420,28 @@ func runRemove(cmd *cobra.Command, args []string) {
 	}
 	defer c.Close()
 
+	// Check if target is a directory
+	stat, err := c.Stat(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if stat.IsDir && !recursive {
+		fmt.Fprintf(os.Stderr, "Error: %s is a directory, use -r to remove\n", path)
+		os.Exit(1)
+	}
+
 	if err := c.Remove(path); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Removed %s\n", path)
+	if stat.IsDir {
+		fmt.Printf("Removed directory %s\n", path)
+	} else {
+		fmt.Printf("Removed %s\n", path)
+	}
 }
 
 func runGlob(cmd *cobra.Command, args []string) {
