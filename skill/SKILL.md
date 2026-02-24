@@ -7,15 +7,26 @@ description: Install and deploy tnl (tunnel-based ephemeral file sharing). Use w
 
 Ephemeral file sharing via WebSocket tunnels. Share files from CLI, access via web or CLI.
 
-## Quick Install (CLI only)
+## Setup Flow
+
+**Before installing, ask user:**
+> Do you want to deploy your own tnl server, or use the public server?
+> - **Public server**: Quick setup, no Cloudflare account needed
+> - **Own server**: Full control, requires Cloudflare account + API token
+
+### Option A: Use Public Server (Quick)
 
 ```bash
-# One-line install
+# Install CLI
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
 
-# Configure server (use public server or user's own)
+# Configure to use public server
 tnl init wss://tnl.dongxuhuang.workers.dev/ws
 ```
+
+### Option B: Deploy Own Server
+
+See [Deploy Own Server](#deploy-own-server-cloudflare-worker) section below, then install CLI.
 
 ## Usage
 
