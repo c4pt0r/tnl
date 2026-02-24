@@ -30,19 +30,44 @@ See [Deploy Own Server](#deploy-own-server-cloudflare-worker) section below, the
 
 ## Usage
 
+### Sharing (host side)
 ```bash
-# Share a directory (read-only)
-tnl share ./mydir
-
-# Share with write access (dangerous!)
-tnl share ./mydir --mode rw
-
-# Access shared files
-tnl ls <code>:/
-tnl cat <code>:/file.txt
-tnl cp <code>:/file.txt ./local
-tnl cp -r <code>:/ ./backup
+tnl share ./mydir              # Read-only (default)
+tnl share ./mydir --mode rw    # Read-write (dangerous!)
 ```
+
+### Browsing (client side)
+```bash
+tnl ls <code>:/                # List root directory
+tnl ls <code>:/subdir          # List subdirectory
+tnl tree <code>:/              # Recursive tree view
+```
+
+### Reading files
+```bash
+tnl cat <code>:/file.txt       # Print file to stdout
+tnl cat <code>:/file.txt > out # Save to file
+```
+
+### Copying files
+```bash
+tnl cp <code>:/file.txt ./local      # Copy single file
+tnl cp -r <code>:/ ./backup          # Copy entire share recursively
+tnl cp -r <code>:/subdir ./local     # Copy subdirectory
+```
+
+### Writing/Deleting (requires --mode rw)
+```bash
+tnl rm <code>:/file.txt        # Delete file
+tnl rm <code>:/subdir          # Delete directory recursively
+# Note: Write via CLI not yet implemented, use web UI
+```
+
+### Web Access
+Share URL is printed when running `tnl share`. Open in browser for:
+- File browsing with syntax highlighting
+- Direct download
+- Raw file view
 
 ## Deploy Own Server (Cloudflare Worker)
 
