@@ -20,3 +20,5 @@ testdir/
 .idea/
 .vscode/
 *.swp
+.dev.vars
+deploy.sh

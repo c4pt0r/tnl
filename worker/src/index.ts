@@ -12,9 +12,11 @@ interface Env {
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const randomBytes = new Uint8Array(10);
+  crypto.getRandomValues(randomBytes);
   let code = '';
   for (let i = 0; i < 10; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[randomBytes[i] % chars.length];
   }
   return code;
 }
@@ -26,13 +28,13 @@ function renderHTML(code: string, path: string, files: any[] | null, error: stri
   let currentPath = '';
   for (const crumb of breadcrumbs) {
     currentPath += '/' + crumb;
-    breadcrumbHTML += ` / <a href="/?code=${code}&path=${encodeURIComponent(currentPath)}">${crumb}</a>`;
+    breadcrumbHTML += ` / <a href="/?code=${code}&path=${encodeURIComponent(currentPath)}">${escapeHtml(crumb)}</a>`;
   }
 
   let contentHTML = '';
   
   if (error) {
-    contentHTML = `<div class="error">❌ ${error}</div>`;
+    contentHTML = `<div class="error">❌ ${escapeHtml(error)}</div>`;
   } else if (fileContent !== null) {
     const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
     const langMap: {[key: string]: string} = {
@@ -46,20 +48,31 @@ function renderHTML(code: string, path: string, files: any[] | null, error: stri
     };
     const lang = langMap[ext] || 'plaintext';
     
+    // Build table with line numbers
+    const lines = fileContent.split('\n');
+    const tableRows = lines.map((line, i) => 
+      `<tr><td class="line-num">${i + 1}</td><td class="line-code"><code>${escapeHtml(line) || ' '}</code></td></tr>`
+    ).join('');
+    
+    const safeFileName = escapeHtml(fileName || '');
     contentHTML = `
       <div class="file-view">
         <div class="file-header">
-          <span>📄 ${fileName}</span>
+          <span>📄 ${safeFileName}</span>
           <div>
             <a href="/?code=${code}&path=${encodeURIComponent(path)}&raw=1" class="btn btn-secondary">Raw</a>
             <a href="/?code=${code}&path=${encodeURIComponent(path)}&download=1" class="btn">⬇️ Download</a>
           </div>
         </div>
-        <pre><code class="language-${lang}">${escapeHtml(fileContent)}</code></pre>
+        <div class="code-scroll">
+          <table class="code-table"><tbody>${tableRows}</tbody></table>
+        </div>
       </div>
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
       <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script>`;
+      <script>
+        document.querySelectorAll('.line-code code').forEach(el => hljs.highlightElement(el));
+      </script>`;
   } else if (files) {
     contentHTML = `<table>
       <tr><th>Name</th><th>Size</th><th>Modified</th></tr>`;
@@ -76,7 +89,7 @@ function renderHTML(code: string, path: string, files: any[] | null, error: stri
       const size = f.isDir ? '-' : formatSize(f.size);
       const date = new Date(f.modTime * 1000).toLocaleString();
       contentHTML += `<tr>
-        <td><a href="/?code=${code}&path=${encodeURIComponent(filePath)}">${icon} ${f.name}</a></td>
+        <td><a href="/?code=${code}&path=${encodeURIComponent(filePath)}">${icon} ${escapeHtml(f.name)}</a></td>
         <td>${size}</td>
         <td>${date}</td>
       </tr>`;
@@ -146,18 +159,45 @@ function renderHTML(code: string, path: string, files: any[] | null, error: stri
     .file-view pre {
       margin: 0;
       padding: 0;
-      overflow-x: auto;
       font-size: 13px;
       line-height: 1.6;
+    }
+    .code-scroll {
+      overflow: auto;
       max-height: 75vh;
-      overflow-y: auto;
-    }
-    .file-view pre code {
-      display: block;
-      padding: 15px;
-    }
-    .file-view pre code.hljs {
       background: #f8f9fa;
+    }
+    .code-table {
+      border-collapse: collapse;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      width: 100%;
+    }
+    .code-table td {
+      padding: 0;
+      border: none;
+      vertical-align: top;
+    }
+    .line-num {
+      text-align: right;
+      padding: 0 12px 0 10px !important;
+      color: #888;
+      background: #f0f0f0;
+      border-right: 1px solid #ddd;
+      user-select: none;
+      -webkit-user-select: none;
+      white-space: nowrap;
+      position: sticky;
+      left: 0;
+    }
+    .line-code {
+      padding-left: 12px !important;
+      white-space: pre;
+    }
+    .line-code code {
+      background: transparent !important;
+      padding: 0 !important;
     }
     .btn-secondary {
       background: #6c757d;
@@ -208,6 +248,18 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// Sanitize filename for Content-Disposition header (RFC 5987)
+function sanitizeFilename(name: string): string {
+  // Remove any path separators and null bytes
+  const cleaned = name.replace(/[\/\\:\x00]/g, '_');
+  // For ASCII-safe fallback, replace non-ASCII and problematic chars
+  const ascii = cleaned.replace(/[^\x20-\x7E]/g, '_').replace(/["]/g, "'");
+  // URL-encode the original for UTF-8 filename*
+  const encoded = encodeURIComponent(cleaned);
+  // Return both forms for compatibility
+  return `filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
 function formatSize(bytes: number): string {
@@ -438,7 +490,7 @@ export class ShareDO {
         return new Response(content, {
           headers: {
             'Content-Type': 'application/octet-stream',
-            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Disposition': `attachment; ${sanitizeFilename(fileName)}`,
             'X-File-Download': '1',
           },
         });

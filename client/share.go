@@ -120,7 +120,11 @@ func (c *ShareClient) handleRequest(msg protocol.Message) {
 }
 
 func (c *ShareClient) handleList(msg protocol.Message) {
-	fullPath := c.resolvePath(msg.Path)
+	fullPath, err := c.resolvePath(msg.Path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
@@ -147,7 +151,11 @@ func (c *ShareClient) handleList(msg protocol.Message) {
 }
 
 func (c *ShareClient) handleTree(msg protocol.Message) {
-	fullPath := c.resolvePath(msg.Path)
+	fullPath, err := c.resolvePath(msg.Path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 
 	var entries []protocol.TreeEntry
 	err := filepath.Walk(fullPath, func(path string, info os.FileInfo, err error) error {
@@ -176,7 +184,11 @@ func (c *ShareClient) handleTree(msg protocol.Message) {
 }
 
 func (c *ShareClient) handleStat(msg protocol.Message) {
-	fullPath := c.resolvePath(msg.Path)
+	fullPath, err := c.resolvePath(msg.Path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 
 	info, err := os.Stat(fullPath)
 	if err != nil {
@@ -194,7 +206,11 @@ func (c *ShareClient) handleStat(msg protocol.Message) {
 }
 
 func (c *ShareClient) handleRead(msg protocol.Message) {
-	fullPath := c.resolvePath(msg.Path)
+	fullPath, err := c.resolvePath(msg.Path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 
 	file, err := os.Open(fullPath)
 	if err != nil {
@@ -266,9 +282,13 @@ func (c *ShareClient) handleRemove(msg protocol.Message) {
 		return
 	}
 
-	fullPath := c.resolvePath(msg.Path)
+	fullPath, err := c.resolvePath(msg.Path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 
-	err := os.RemoveAll(fullPath)
+	err = os.RemoveAll(fullPath)
 	if err != nil {
 		c.sendError(msg.ReqID, err.Error())
 		return
@@ -277,10 +297,33 @@ func (c *ShareClient) handleRemove(msg protocol.Message) {
 	c.sendResult(msg.ReqID, "ok")
 }
 
-func (c *ShareClient) resolvePath(path string) string {
+func (c *ShareClient) resolvePath(path string) (string, error) {
 	// Clean and join with root, prevent path traversal
 	cleaned := filepath.Clean("/" + path)
-	return filepath.Join(c.rootPath, cleaned)
+	fullPath := filepath.Join(c.rootPath, cleaned)
+	
+	// Resolve symlinks and verify still within root
+	realPath, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		// File might not exist yet (for write operations), check parent
+		parentPath := filepath.Dir(fullPath)
+		realParent, err := filepath.EvalSymlinks(parentPath)
+		if err != nil {
+			return "", fmt.Errorf("path not accessible")
+		}
+		realRoot, _ := filepath.EvalSymlinks(c.rootPath)
+		if !strings.HasPrefix(realParent+"/", realRoot+"/") && realParent != realRoot {
+			return "", fmt.Errorf("access denied: path outside share root")
+		}
+		return fullPath, nil
+	}
+	
+	realRoot, _ := filepath.EvalSymlinks(c.rootPath)
+	if !strings.HasPrefix(realPath+"/", realRoot+"/") && realPath != realRoot {
+		return "", fmt.Errorf("access denied: path outside share root")
+	}
+	
+	return fullPath, nil
 }
 
 func (c *ShareClient) sendResult(reqID string, data any) {
@@ -309,7 +352,11 @@ func (c *ShareClient) handleGlob(msg protocol.Message) {
 	pattern := msg.Path
 	
 	// Convert glob pattern to work with our root
-	fullPattern := c.resolvePath(pattern)
+	fullPattern, err := c.resolvePath(pattern)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 	
 	matches, err := filepath.Glob(fullPattern)
 	if err != nil {
@@ -367,7 +414,11 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 		return
 	}
 	
-	fullPath := c.resolvePath(path)
+	fullPath, err := c.resolvePath(path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 	var matches []protocol.GrepMatch
 	counts := make(map[string]int)
 	filesWithMatches := make(map[string]bool)
@@ -502,7 +553,11 @@ func (c *ShareClient) handleWrite(msg protocol.Message) {
 	content, _ := data["content"].(string)
 	append_, _ := data["append"].(bool)
 
-	fullPath := c.resolvePath(msg.Path)
+	fullPath, err := c.resolvePath(msg.Path)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
 
 	// Ensure parent directory exists
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
