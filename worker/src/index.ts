@@ -346,6 +346,7 @@ export class ShareDO {
   publicUrl: string = '';
   mode: string = 'ro';
   pendingRequests: Map<string, { resolve: Function; reject: Function }> = new Map();
+  pendingChunks: Map<string, string[]> = new Map(); // accumulate chunks for web UI
   wsRequests: Map<string, WebSocket> = new Map();
   
   constructor(state: DurableObjectState) {
@@ -517,11 +518,23 @@ export class ShareDO {
             }
           }
         } else if (msg.op === 'chunk') {
-          // Handle chunk for web UI
+          // Handle chunk for web UI - accumulate all chunks
           const pending = this.pendingRequests.get(msg.reqId);
-          if (pending && msg.eof) {
-            this.pendingRequests.delete(msg.reqId);
-            pending.resolve({ content: msg.data });
+          if (pending) {
+            // Accumulate chunk data
+            if (!this.pendingChunks.has(msg.reqId)) {
+              this.pendingChunks.set(msg.reqId, []);
+            }
+            this.pendingChunks.get(msg.reqId)!.push(msg.data);
+            
+            if (msg.eof) {
+              // Combine all chunks and resolve
+              const allChunks = this.pendingChunks.get(msg.reqId)!;
+              const fullContent = allChunks.join('');
+              this.pendingChunks.delete(msg.reqId);
+              this.pendingRequests.delete(msg.reqId);
+              pending.resolve({ content: fullContent });
+            }
           }
           
           // Forward to WebSocket accessor
