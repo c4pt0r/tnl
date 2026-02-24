@@ -158,7 +158,7 @@ func (c *ShareClient) handleTree(msg protocol.Message) {
 	}
 
 	var entries []protocol.TreeEntry
-	err := filepath.Walk(fullPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(fullPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
