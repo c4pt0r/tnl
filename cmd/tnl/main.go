@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -309,17 +310,44 @@ func runCopy(cmd *cobra.Command, args []string) {
 	defer c.Close()
 
 	if recursive {
-		if err := c.CopyRecursive(remotePath, localPath, progress); err != nil {
+		// Recursive copy - handle scp-like behavior
+		finalPath := localPath
+		srcName := filepath.Base(remotePath)
+		isRoot := srcName == "" || srcName == "." || srcName == "/"
+		
+		// If destination exists and is a directory, and source is not root,
+		// create source dir inside destination (scp behavior)
+		if info, err := os.Stat(localPath); err == nil && info.IsDir() && !isRoot {
+			finalPath = filepath.Join(localPath, srcName)
+		}
+		
+		if err := c.CopyRecursive(remotePath, finalPath, progress); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("\nCopied to %s/\n", localPath)
+		fmt.Printf("\nCopied to %s/\n", finalPath)
 	} else {
-		if err := c.Copy(remotePath, localPath, progress); err != nil {
+		// Single file copy - handle scp-like behavior
+		finalPath := localPath
+
+		// Check if destination is a directory or ends with /
+		if info, err := os.Stat(localPath); err == nil && info.IsDir() {
+			// Destination is existing directory - use original filename
+			finalPath = filepath.Join(localPath, filepath.Base(remotePath))
+		} else if strings.HasSuffix(localPath, "/") || strings.HasSuffix(localPath, string(os.PathSeparator)) {
+			// Destination ends with / - create directory and use original filename
+			if err := os.MkdirAll(localPath, 0755); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			finalPath = filepath.Join(localPath, filepath.Base(remotePath))
+		}
+
+		if err := c.Copy(remotePath, finalPath, progress); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("\nCopied to %s\n", localPath)
+		fmt.Printf("\nCopied to %s\n", finalPath)
 	}
 }
 
