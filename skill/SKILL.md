@@ -34,54 +34,72 @@ See [Deploy Own Server](#deploy-own-server-cloudflare-worker) section below, the
 ```bash
 tnl share ./mydir              # Read-only (default)
 tnl share ./mydir --mode rw    # Read-write (dangerous!)
+# Press Ctrl+C to stop sharing
 ```
 
-### Browsing (client side)
+### Browsing
 ```bash
-tnl ls <code>:/                # List root directory
+tnl ls <code>:/                # List with permissions, size, date
 tnl ls <code>:/subdir          # List subdirectory
-tnl tree <code>:/              # Recursive tree view
+tnl tree <code>:/              # Recursive tree with sizes
 ```
 
-### Reading files
+### Reading
 ```bash
-tnl cat <code>:/file.txt       # Print file to stdout
-tnl cat <code>:/file.txt > out # Save to file
+tnl cat <code>:/file.txt       # Print to stdout
+tnl cat <code>:/file.txt > out # Redirect to file
 ```
 
-### Copying files
+### Copying
 ```bash
-tnl cp <code>:/file.txt ./local      # Copy single file
-tnl cp -r <code>:/ ./backup          # Copy entire share recursively
-tnl cp -r <code>:/subdir ./local     # Copy subdirectory
+tnl cp <code>:/file.txt ./         # Copy to current dir
+tnl cp <code>:/file.txt ./new.txt  # Copy with rename
+tnl cp -r <code>:/ ./backup        # Recursive copy
+tnl cp -r <code>:/src ./           # Copy subdir
+# Supports scp-like path behavior
 ```
 
 ### Searching
 ```bash
-tnl grep "TODO" <code>:/             # Search all files
-tnl grep -i "error" <code>:/         # Case insensitive
-tnl grep -l "import" <code>:/        # Only show filenames
-tnl grep -c "func" <code>:/src       # Count matches per file
-tnl grep -w "main" <code>:/          # Whole word match
+# grep - regex search
+tnl grep "pattern" <code>:/        # Search all files
+tnl grep -i "error" <code>:/       # Case insensitive
+tnl grep -w "main" <code>:/        # Whole word only
+tnl grep -l "import" <code>:/      # List filenames only
+tnl grep -c "func" <code>:/        # Count matches per file
+tnl grep -A 3 "TODO" <code>:/      # 3 lines after match
+tnl grep -B 2 "TODO" <code>:/      # 2 lines before match
+tnl grep -C 2 "TODO" <code>:/      # 2 lines context (before+after)
 
-tnl glob <code>:/*.txt               # Find .txt in root
-tnl glob <code>:/**/*.go             # Find .go recursively
+# glob - pattern matching
+tnl glob <code>:/*.txt             # .txt in root
+tnl glob <code>:/**/*.go           # .go files recursively
+tnl glob <code>:/src/*.{js,ts}     # Multiple extensions
 ```
 
 ### Writing (requires --mode rw)
 ```bash
-echo "hello" | tnl tee <code>:/file.txt    # Write stdin to file
-cat data.json | tnl tee <code>:/data.json  # Pipe to remote
+# tee - write stdin to remote (and stdout)
+echo "hello" | tnl tee <code>:/file.txt      # Write/overwrite
+cat log.txt | tnl tee -a <code>:/log.txt     # Append mode
 
-tnl rm <code>:/file.txt        # Delete file
-tnl rm <code>:/subdir          # Delete directory recursively
+# rm - delete
+tnl rm <code>:/file.txt            # Delete file
+tnl rm -r <code>:/subdir           # Delete directory recursively
 ```
 
 ### Web Access
-Share URL is printed when running `tnl share`. Open in browser for:
-- File browsing with syntax highlighting
-- Direct download
-- Raw file view
+Share URL printed on `tnl share`. Features:
+- Directory browsing
+- Syntax highlighting (JS/TS/Go/Python/Rust/JSON/YAML...)
+- Line numbers
+- Raw view / Download buttons
+
+### Global Flags
+```bash
+--worker <url>   # Override server URL
+-p, --progress   # Show progress bar (default: true)
+```
 
 ## Deploy Own Server (Cloudflare Worker)
 
