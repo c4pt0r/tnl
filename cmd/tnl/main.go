@@ -15,14 +15,17 @@ import (
 )
 
 var (
-	workerURL  string
-	mode       string
-	recursive  bool
-	progress   bool
-	ignoreCase bool
-	filesOnly  bool
-	countOnly  bool
-	wordMatch  bool
+	workerURL    string
+	mode         string
+	recursive    bool
+	progress     bool
+	ignoreCase   bool
+	filesOnly    bool
+	countOnly    bool
+	wordMatch    bool
+	afterContext int
+	beforeContext int
+	context      int
 )
 
 // Config file structure
@@ -168,6 +171,9 @@ Examples:
 	grepCmd.Flags().BoolVarP(&filesOnly, "files-with-matches", "l", false, "Only show filenames")
 	grepCmd.Flags().BoolVarP(&countOnly, "count", "c", false, "Only show match count per file")
 	grepCmd.Flags().BoolVarP(&wordMatch, "word-regexp", "w", false, "Match whole words only")
+	grepCmd.Flags().IntVarP(&afterContext, "after-context", "A", 0, "Show N lines after match")
+	grepCmd.Flags().IntVarP(&beforeContext, "before-context", "B", 0, "Show N lines before match")
+	grepCmd.Flags().IntVarP(&context, "context", "C", 0, "Show N lines before and after match")
 	rootCmd.AddCommand(grepCmd)
 
 	// init command - setup config
@@ -458,11 +464,21 @@ func runGrep(cmd *cobra.Command, args []string) {
 	}
 	defer c.Close()
 
+	// -C sets both before and after
+	before := beforeContext
+	after := afterContext
+	if context > 0 {
+		before = context
+		after = context
+	}
+
 	opts := protocol.GrepOptions{
-		IgnoreCase: ignoreCase,
-		FilesOnly:  filesOnly,
-		CountOnly:  countOnly,
-		WordMatch:  wordMatch,
+		IgnoreCase:    ignoreCase,
+		FilesOnly:     filesOnly,
+		CountOnly:     countOnly,
+		WordMatch:     wordMatch,
+		BeforeContext: before,
+		AfterContext:  after,
 	}
 
 	result, err := c.Grep(pattern, path, opts)
@@ -492,8 +508,30 @@ func runGrep(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "\nTotal: %d matches in %d files\n", total, len(result.Counts))
 		}
 	} else {
-		for _, m := range result.Matches {
+		lastPath := ""
+		for i, m := range result.Matches {
+			// Separator between matches (if showing context)
+			if i > 0 && (len(m.Before) > 0 || len(result.Matches[i-1].After) > 0) {
+				if lastPath != m.Path {
+					fmt.Println("--")
+				}
+			}
+			lastPath = m.Path
+			
+			// Before context
+			for j, line := range m.Before {
+				lineNum := m.Line - len(m.Before) + j
+				fmt.Printf("\033[35m%s\033[0m-\033[32m%d\033[0m-%s\n", m.Path, lineNum, line)
+			}
+			
+			// Match line
 			fmt.Printf("\033[35m%s\033[0m:\033[32m%d\033[0m:%s\n", m.Path, m.Line, m.Content)
+			
+			// After context
+			for j, line := range m.After {
+				lineNum := m.Line + j + 1
+				fmt.Printf("\033[35m%s\033[0m-\033[32m%d\033[0m-%s\n", m.Path, lineNum, line)
+			}
 		}
 		if len(result.Matches) == 0 {
 			fmt.Fprintln(os.Stderr, "No matches found")

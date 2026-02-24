@@ -441,12 +441,14 @@ func (c *RemoteClient) Grep(pattern, path string, opts protocol.GrepOptions) (*p
 		"op":    protocol.OpGrep,
 		"reqId": reqID,
 		"data": map[string]any{
-			"pattern":    pattern,
-			"path":       path,
-			"ignoreCase": opts.IgnoreCase,
-			"filesOnly":  opts.FilesOnly,
-			"countOnly":  opts.CountOnly,
-			"wordMatch":  opts.WordMatch,
+			"pattern":       pattern,
+			"path":          path,
+			"ignoreCase":    opts.IgnoreCase,
+			"filesOnly":     opts.FilesOnly,
+			"countOnly":     opts.CountOnly,
+			"wordMatch":     opts.WordMatch,
+			"beforeContext": opts.BeforeContext,
+			"afterContext":  opts.AfterContext,
 		},
 	})
 	if err != nil {

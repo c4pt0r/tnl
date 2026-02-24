@@ -97,9 +97,11 @@ type GlobResult struct {
 
 // GrepMatch for grep results
 type GrepMatch struct {
-	Path    string `json:"path"`
-	Line    int    `json:"line"`
-	Content string `json:"content"`
+	Path    string   `json:"path"`
+	Line    int      `json:"line"`
+	Content string   `json:"content"`
+	Before  []string `json:"before,omitempty"`  // context lines before
+	After   []string `json:"after,omitempty"`   // context lines after
 }
 
 // GrepResult for grep matches
@@ -111,8 +113,10 @@ type GrepResult struct {
 
 // GrepOptions for grep flags
 type GrepOptions struct {
-	IgnoreCase bool `json:"ignoreCase"`
-	FilesOnly  bool `json:"filesOnly"`
-	CountOnly  bool `json:"countOnly"`
-	WordMatch  bool `json:"wordMatch"`
+	IgnoreCase    bool `json:"ignoreCase"`
+	FilesOnly     bool `json:"filesOnly"`
+	CountOnly     bool `json:"countOnly"`
+	WordMatch     bool `json:"wordMatch"`
+	BeforeContext int  `json:"beforeContext"`
+	AfterContext  int  `json:"afterContext"`
 }

@@ -341,6 +341,10 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 	filesOnly, _ := data["filesOnly"].(bool)
 	countOnly, _ := data["countOnly"].(bool)
 	wordMatch, _ := data["wordMatch"].(bool)
+	beforeCtx, _ := data["beforeContext"].(float64)
+	afterCtx, _ := data["afterContext"].(float64)
+	beforeContext := int(beforeCtx)
+	afterContext := int(afterCtx)
 	
 	if path == "" {
 		path = "/"
@@ -365,6 +369,7 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 	var matches []protocol.GrepMatch
 	counts := make(map[string]int)
 	filesWithMatches := make(map[string]bool)
+	needContext := beforeContext > 0 || afterContext > 0
 	
 	// Walk through files
 	filepath.Walk(fullPath, func(fpath string, info os.FileInfo, err error) error {
@@ -385,39 +390,81 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 		
 		relPath, _ := filepath.Rel(c.rootPath, fpath)
 		relPath = "/" + relPath
-		scanner := bufio.NewScanner(file)
-		lineNum := 0
-		fileMatchCount := 0
 		
-		for scanner.Scan() {
-			lineNum++
-			line := scanner.Text()
-			if re.MatchString(line) {
-				fileMatchCount++
-				filesWithMatches[relPath] = true
-				
-				// Only collect full matches if not in filesOnly/countOnly mode
-				if !filesOnly && !countOnly {
+		// For context, read all lines first
+		if needContext && !filesOnly && !countOnly {
+			allLines := []string{}
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				allLines = append(allLines, scanner.Text())
+			}
+			
+			for lineIdx, line := range allLines {
+				if re.MatchString(line) {
+					filesWithMatches[relPath] = true
+					counts[relPath]++
+					
+					// Get before context
+					var before []string
+					start := lineIdx - beforeContext
+					if start < 0 {
+						start = 0
+					}
+					for i := start; i < lineIdx; i++ {
+						before = append(before, truncate(allLines[i], 200))
+					}
+					
+					// Get after context
+					var after []string
+					end := lineIdx + afterContext + 1
+					if end > len(allLines) {
+						end = len(allLines)
+					}
+					for i := lineIdx + 1; i < end; i++ {
+						after = append(after, truncate(allLines[i], 200))
+					}
+					
 					matches = append(matches, protocol.GrepMatch{
 						Path:    relPath,
-						Line:    lineNum,
+						Line:    lineIdx + 1,
 						Content: truncate(line, 200),
+						Before:  before,
+						After:   after,
 					})
-					// Limit matches
-					if len(matches) > 1000 {
+					
+					if len(matches) > 500 {
 						return filepath.SkipAll
 					}
 				}
-				
-				// For filesOnly, one match is enough
-				if filesOnly {
-					return nil
+			}
+		} else {
+			// No context needed - stream through file
+			scanner := bufio.NewScanner(file)
+			lineNum := 0
+			
+			for scanner.Scan() {
+				lineNum++
+				line := scanner.Text()
+				if re.MatchString(line) {
+					filesWithMatches[relPath] = true
+					counts[relPath]++
+					
+					if !filesOnly && !countOnly {
+						matches = append(matches, protocol.GrepMatch{
+							Path:    relPath,
+							Line:    lineNum,
+							Content: truncate(line, 200),
+						})
+						if len(matches) > 1000 {
+							return filepath.SkipAll
+						}
+					}
+					
+					if filesOnly {
+						return nil
+					}
 				}
 			}
-		}
-		
-		if fileMatchCount > 0 {
-			counts[relPath] = fileMatchCount
 		}
 		return nil
 	})
