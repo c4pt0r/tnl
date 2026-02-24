@@ -1,0 +1,72 @@
+package protocol
+
+// Message types
+const (
+	// Control messages
+	OpRegister = "register" // client -> worker: register share
+	OpRegistered = "registered" // worker -> client: share code assigned
+
+	// File operations (B -> Worker -> A)
+	OpList   = "ls"
+	OpRead   = "cat"
+	OpCopy   = "cp"
+	OpRemove = "rm"
+	OpStat   = "stat"
+
+	// Responses
+	OpResult = "result"
+	OpError  = "error"
+	OpChunk  = "chunk" // for streaming file content
+)
+
+// Message is the base message format
+type Message struct {
+	Op    string `json:"op"`
+	ReqID string `json:"reqId,omitempty"`
+	Path  string `json:"path,omitempty"`
+	Data  any    `json:"data,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+// RegisterMsg sent by sharer to worker
+type RegisterMsg struct {
+	Op       string `json:"op"`
+	Mode     string `json:"mode"` // "ro" or "rw"
+}
+
+// RegisteredMsg response from worker
+type RegisteredMsg struct {
+	Op        string `json:"op"`
+	ShareCode string `json:"shareCode"`
+	PublicURL string `json:"publicUrl"`
+}
+
+// FileInfo for directory listings
+type FileInfo struct {
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	Mode    string `json:"mode"`
+	ModTime int64  `json:"modTime"`
+	IsDir   bool   `json:"isDir"`
+}
+
+// ListResult for ls response
+type ListResult struct {
+	Files []FileInfo `json:"files"`
+}
+
+// ChunkMsg for streaming file content
+type ChunkMsg struct {
+	Op     string `json:"op"`
+	ReqID  string `json:"reqId"`
+	Data   []byte `json:"data"`   // base64 encoded in JSON
+	Offset int64  `json:"offset"`
+	EOF    bool   `json:"eof"`
+}
+
+// ErrorMsg for error responses
+type ErrorMsg struct {
+	Op    string `json:"op"`
+	ReqID string `json:"reqId"`
+	Error string `json:"error"`
+}

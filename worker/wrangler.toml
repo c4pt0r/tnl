@@ -1,0 +1,12 @@
+name = "tnl"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[durable_objects]
+bindings = [
+  { name = "SHARES", class_name = "ShareDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShareDO"]

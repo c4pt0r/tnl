@@ -1,0 +1,25 @@
+# Binaries
+/tnl
+*.exe
+
+# Go
+go.sum
+
+# Node
+node_modules/
+worker/node_modules/
+
+# Wrangler
+.wrangler/
+worker/.wrangler/
+
+# Test files
+testdir/
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
