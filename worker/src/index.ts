@@ -362,7 +362,9 @@ async function handleWebUI(request: Request, env: Env, url: URL, code: string): 
       headers: { 'Content-Type': 'text/html' },
     });
   } catch (e) {
-    return new Response(renderHTML(code, path, null, 'Share not available or expired', null, null), {
+    const errorMsg = e instanceof Error ? `Error: ${e.message}` : 'Share not available or expired';
+    console.error('Web UI error:', e);
+    return new Response(renderHTML(code, path, null, errorMsg, null, null), {
       headers: { 'Content-Type': 'text/html' },
     });
   }
@@ -439,7 +441,7 @@ export class ShareDO {
   
   async handleWebUIRequest(url: URL): Promise<Response> {
     const path = url.searchParams.get('path') || '/';
-    const download = url.searchParams.get('download') === '1';
+    let download = url.searchParams.get('download') === '1';
     const raw = url.searchParams.get('raw') === '1';
     
     if (!this.sharerWs || this.sharerWs.readyState !== WebSocket.OPEN) {
@@ -450,11 +452,16 @@ export class ShareDO {
     
     // First, stat to check if it's a file or directory
     const statResult = await this.sendRequest(reqId + '-stat', { op: 'stat', reqId: reqId + '-stat', path });
-    
+
     if (statResult.error) {
       return Response.json({ error: statResult.error });
     }
-    
+
+    // Validate stat result
+    if (!statResult.data) {
+      return Response.json({ error: 'Invalid stat response from client' });
+    }
+
     if (statResult.data.isDir) {
       // List directory
       const listResult = await this.sendRequest(reqId, { op: 'ls', reqId, path });
@@ -463,22 +470,35 @@ export class ShareDO {
       }
       return Response.json({ files: listResult.data.files });
     } else {
-      // It's a file
+      // It's a file - check if it's a text file
+      const fileName = path.split('/').pop() || 'file';
+      const ext = fileName.split('.').pop()?.toLowerCase() || '';
+
+      // Define text file extensions
+      const textExts = ['txt', 'md', 'json', 'yaml', 'yml', 'toml', 'xml', 'html', 'css', 'scss',
+                        'js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'rb', 'java', 'c', 'cpp',
+                        'h', 'hpp', 'sh', 'bash', 'zsh', 'sql', 'log', 'conf', 'cfg', 'ini',
+                        'env', 'Dockerfile', 'makefile', 'gradle', 'properties', 'gitignore'];
+
+      const isTextFile = textExts.includes(ext) || fileName.toLowerCase() === 'dockerfile' || fileName.toLowerCase() === 'makefile';
+
+      // For non-text files, force download instead of preview
+      if (!isTextFile && !download && !raw) {
+        download = true;
+      }
+
       if (download || raw) {
         // Stream file download or raw view
         const readResult = await this.sendRequest(reqId, { op: 'cat', reqId, path, compress: false });
         if (readResult.error) {
           return Response.json({ error: readResult.error });
         }
-        
+
         const content = this.base64ToArrayBuffer(readResult.content);
-        const fileName = path.split('/').pop() || 'file';
-        
+
         if (raw) {
           // Raw text view
-          const ext = fileName.split('.').pop()?.toLowerCase() || '';
-          const textExts = ['txt', 'md', 'json', 'yaml', 'yml', 'toml', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'rb', 'java', 'c', 'cpp', 'h', 'hpp', 'sh', 'bash', 'sql', 'log', 'conf', 'cfg', 'ini', 'env'];
-          const contentType = textExts.includes(ext) ? 'text/plain; charset=utf-8' : 'application/octet-stream';
+          const contentType = isTextFile ? 'text/plain; charset=utf-8' : 'application/octet-stream';
           return new Response(content, {
             headers: {
               'Content-Type': contentType,
@@ -500,11 +520,21 @@ export class ShareDO {
         if (readResult.error) {
           return Response.json({ error: readResult.error });
         }
-        
-        const content = atob(readResult.content);
+
+        // Check if content exists
+        if (!readResult.content) {
+          return Response.json({ error: 'File content not received from client' });
+        }
+
+        let content: string;
+        try {
+          content = atob(readResult.content);
+        } catch (e) {
+          return Response.json({ error: 'Invalid file content encoding: ' + (e as Error).message });
+        }
+
         const preview = content.length > 100000 ? content.slice(0, 100000) + '\n\n... (truncated)' : content;
-        const fileName = path.split('/').pop() || 'file';
-        
+
         return Response.json({ content: preview, name: fileName });
       }
     }

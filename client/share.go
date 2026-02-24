@@ -223,8 +223,8 @@ func (c *ShareClient) handleRead(msg protocol.Message) {
 	stat, _ := file.Stat()
 	fileSize := stat.Size()
 
-	// Stream file in chunks
-	buf := make([]byte, 64*1024) // 64KB chunks
+	// Stream file in chunks (size must be multiple of 3 for base64 concatenation)
+	buf := make([]byte, 63*1024) // 63KB = 64512 bytes = 3 * 21504
 	offset := int64(0)
 	firstChunk := true
 
