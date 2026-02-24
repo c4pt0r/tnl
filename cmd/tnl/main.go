@@ -18,6 +18,8 @@ const (
 var (
 	workerURL string
 	mode      string
+	recursive bool
+	progress  bool
 )
 
 func main() {
@@ -27,6 +29,7 @@ func main() {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&workerURL, "worker", defaultWorkerURL, "Worker WebSocket URL")
+	rootCmd.PersistentFlags().BoolVarP(&progress, "progress", "p", true, "Show progress bar")
 
 	// share command
 	shareCmd := &cobra.Command{
@@ -59,10 +62,11 @@ func main() {
 	// cp command
 	cpCmd := &cobra.Command{
 		Use:   "cp <shareCode:remotePath> <localPath>",
-		Short: "Copy remote file to local",
+		Short: "Copy remote file/directory to local",
 		Args:  cobra.ExactArgs(2),
 		Run:   runCopy,
 	}
+	cpCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Copy directories recursively")
 	rootCmd.AddCommand(cpCmd)
 
 	// rm command
@@ -73,6 +77,15 @@ func main() {
 		Run:   runRemove,
 	}
 	rootCmd.AddCommand(rmCmd)
+
+	// tree command
+	treeCmd := &cobra.Command{
+		Use:   "tree <shareCode:path>",
+		Short: "List remote directory tree recursively",
+		Args:  cobra.ExactArgs(1),
+		Run:   runTree,
+	}
+	rootCmd.AddCommand(treeCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -105,6 +118,7 @@ func runShare(cmd *cobra.Command, args []string) {
 	fmt.Printf("Others can access with:\n")
 	fmt.Printf("  tnl ls %s:/\n", shareCode)
 	fmt.Printf("  tnl cp %s:<file> ./local\n", shareCode)
+	fmt.Printf("  tnl cp -r %s:/ ./localdir\n", shareCode)
 	fmt.Printf("\n")
 	fmt.Printf("Press Ctrl+C to stop sharing\n")
 
@@ -148,6 +162,44 @@ func runList(cmd *cobra.Command, args []string) {
 	w.Flush()
 }
 
+func runTree(cmd *cobra.Command, args []string) {
+	shareCode, path, err := client.ParseRemotePath(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	c, err := client.NewRemoteClient(workerURL, shareCode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer c.Close()
+
+	entries, err := c.Tree(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	var totalSize int64
+	for _, e := range entries {
+		prefix := ""
+		if e.IsDir {
+			prefix = "📁 "
+		} else {
+			prefix = "📄 "
+			totalSize += e.Size
+		}
+		if e.Path == "" {
+			fmt.Printf("%s.\n", prefix)
+		} else {
+			fmt.Printf("%s%s  (%s)\n", prefix, e.Path, formatSize(e.Size))
+		}
+	}
+	fmt.Printf("\nTotal: %s\n", formatSize(totalSize))
+}
+
 func runCat(cmd *cobra.Command, args []string) {
 	shareCode, path, err := client.ParseRemotePath(args[0])
 	if err != nil {
@@ -183,12 +235,19 @@ func runCopy(cmd *cobra.Command, args []string) {
 	}
 	defer c.Close()
 
-	if err := c.Copy(remotePath, localPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	if recursive {
+		if err := c.CopyRecursive(remotePath, localPath, progress); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("\nCopied to %s/\n", localPath)
+	} else {
+		if err := c.Copy(remotePath, localPath, progress); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("\nCopied to %s\n", localPath)
 	}
-
-	fmt.Printf("Copied to %s\n", localPath)
 }
 
 func runRemove(cmd *cobra.Command, args []string) {

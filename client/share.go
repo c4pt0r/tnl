@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -101,6 +103,8 @@ func (c *ShareClient) handleRequest(msg protocol.Message) {
 		c.handleStat(msg)
 	case protocol.OpRemove:
 		c.handleRemove(msg)
+	case "tree": // recursive listing
+		c.handleTree(msg)
 	default:
 		c.sendError(msg.ReqID, "unknown operation: "+msg.Op)
 	}
@@ -108,7 +112,7 @@ func (c *ShareClient) handleRequest(msg protocol.Message) {
 
 func (c *ShareClient) handleList(msg protocol.Message) {
 	fullPath := c.resolvePath(msg.Path)
-	
+
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		c.sendError(msg.ReqID, err.Error())
@@ -133,9 +137,38 @@ func (c *ShareClient) handleList(msg protocol.Message) {
 	c.sendResult(msg.ReqID, protocol.ListResult{Files: files})
 }
 
+func (c *ShareClient) handleTree(msg protocol.Message) {
+	fullPath := c.resolvePath(msg.Path)
+
+	var entries []protocol.TreeEntry
+	err := filepath.Walk(fullPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip errors
+		}
+		relPath, _ := filepath.Rel(fullPath, path)
+		if relPath == "." {
+			relPath = ""
+		}
+		entries = append(entries, protocol.TreeEntry{
+			Path:    relPath,
+			Size:    info.Size(),
+			Mode:    info.Mode().String(),
+			ModTime: info.ModTime().Unix(),
+			IsDir:   info.IsDir(),
+		})
+		return nil
+	})
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
+
+	c.sendResult(msg.ReqID, protocol.TreeResult{Entries: entries})
+}
+
 func (c *ShareClient) handleStat(msg protocol.Message) {
 	fullPath := c.resolvePath(msg.Path)
-	
+
 	info, err := os.Stat(fullPath)
 	if err != nil {
 		c.sendError(msg.ReqID, err.Error())
@@ -153,7 +186,7 @@ func (c *ShareClient) handleStat(msg protocol.Message) {
 
 func (c *ShareClient) handleRead(msg protocol.Message) {
 	fullPath := c.resolvePath(msg.Path)
-	
+
 	file, err := os.Open(fullPath)
 	if err != nil {
 		c.sendError(msg.ReqID, err.Error())
@@ -161,20 +194,46 @@ func (c *ShareClient) handleRead(msg protocol.Message) {
 	}
 	defer file.Close()
 
+	// Get file size for progress
+	stat, _ := file.Stat()
+	fileSize := stat.Size()
+
 	// Stream file in chunks
 	buf := make([]byte, 64*1024) // 64KB chunks
 	offset := int64(0)
+	firstChunk := true
 
 	for {
 		n, err := file.Read(buf)
 		eof := err == io.EOF
 		if n > 0 {
+			data := buf[:n]
+
+			// Compress if requested
+			compressed := false
+			if msg.Compress {
+				var compBuf bytes.Buffer
+				gw := gzip.NewWriter(&compBuf)
+				gw.Write(data)
+				gw.Close()
+				// Only use compressed if smaller
+				if compBuf.Len() < n {
+					data = compBuf.Bytes()
+					compressed = true
+				}
+			}
+
 			chunk := map[string]any{
-				"op":     protocol.OpChunk,
-				"reqId":  msg.ReqID,
-				"data":   base64.StdEncoding.EncodeToString(buf[:n]),
-				"offset": offset,
-				"eof":    eof,
+				"op":       protocol.OpChunk,
+				"reqId":    msg.ReqID,
+				"data":     base64.StdEncoding.EncodeToString(data),
+				"offset":   offset,
+				"eof":      eof,
+				"compress": compressed,
+			}
+			if firstChunk {
+				chunk["size"] = fileSize
+				firstChunk = false
 			}
 			c.send(chunk)
 			offset += int64(n)
@@ -196,7 +255,7 @@ func (c *ShareClient) handleRemove(msg protocol.Message) {
 	}
 
 	fullPath := c.resolvePath(msg.Path)
-	
+
 	err := os.RemoveAll(fullPath)
 	if err != nil {
 		c.sendError(msg.ReqID, err.Error())

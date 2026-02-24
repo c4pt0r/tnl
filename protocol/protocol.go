@@ -3,7 +3,7 @@ package protocol
 // Message types
 const (
 	// Control messages
-	OpRegister = "register" // client -> worker: register share
+	OpRegister   = "register"   // client -> worker: register share
 	OpRegistered = "registered" // worker -> client: share code assigned
 
 	// File operations (B -> Worker -> A)
@@ -21,17 +21,18 @@ const (
 
 // Message is the base message format
 type Message struct {
-	Op    string `json:"op"`
-	ReqID string `json:"reqId,omitempty"`
-	Path  string `json:"path,omitempty"`
-	Data  any    `json:"data,omitempty"`
-	Error string `json:"error,omitempty"`
+	Op       string `json:"op"`
+	ReqID    string `json:"reqId,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Data     any    `json:"data,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Compress bool   `json:"compress,omitempty"` // request gzip compression
 }
 
 // RegisterMsg sent by sharer to worker
 type RegisterMsg struct {
-	Op       string `json:"op"`
-	Mode     string `json:"mode"` // "ro" or "rw"
+	Op   string `json:"op"`
+	Mode string `json:"mode"` // "ro" or "rw"
 }
 
 // RegisteredMsg response from worker
@@ -57,11 +58,13 @@ type ListResult struct {
 
 // ChunkMsg for streaming file content
 type ChunkMsg struct {
-	Op     string `json:"op"`
-	ReqID  string `json:"reqId"`
-	Data   []byte `json:"data"`   // base64 encoded in JSON
-	Offset int64  `json:"offset"`
-	EOF    bool   `json:"eof"`
+	Op       string `json:"op"`
+	ReqID    string `json:"reqId"`
+	Data     []byte `json:"data"`   // base64 encoded in JSON
+	Offset   int64  `json:"offset"`
+	EOF      bool   `json:"eof"`
+	Compress bool   `json:"compress"` // data is gzip compressed
+	Size     int64  `json:"size"`     // total file size (sent in first chunk)
 }
 
 // ErrorMsg for error responses
@@ -69,4 +72,18 @@ type ErrorMsg struct {
 	Op    string `json:"op"`
 	ReqID string `json:"reqId"`
 	Error string `json:"error"`
+}
+
+// TreeEntry for recursive listing
+type TreeEntry struct {
+	Path    string `json:"path"`    // relative path from root
+	Size    int64  `json:"size"`
+	Mode    string `json:"mode"`
+	ModTime int64  `json:"modTime"`
+	IsDir   bool   `json:"isDir"`
+}
+
+// TreeResult for recursive ls
+type TreeResult struct {
+	Entries []TreeEntry `json:"entries"`
 }
