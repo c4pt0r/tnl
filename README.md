@@ -1,4 +1,4 @@
-# tnl - Tunnel File Sharing
+# tnl - Tunnel File (Directory) Sharing
 
 A simple, ephemeral file sharing tool using WebSocket tunnels through Cloudflare Workers.
 
