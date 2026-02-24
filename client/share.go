@@ -206,12 +206,14 @@ func (c *ShareClient) handleRead(msg protocol.Message) {
 	for {
 		n, err := file.Read(buf)
 		eof := err == io.EOF
-		if n > 0 {
+
+		// Send chunk if we have data OR if it's EOF (to signal completion)
+		if n > 0 || eof {
 			data := buf[:n]
 
-			// Compress if requested
+			// Compress if requested and we have data
 			compressed := false
-			if msg.Compress {
+			if msg.Compress && n > 0 {
 				var compBuf bytes.Buffer
 				gw := gzip.NewWriter(&compBuf)
 				gw.Write(data)
@@ -238,6 +240,7 @@ func (c *ShareClient) handleRead(msg protocol.Message) {
 			c.send(chunk)
 			offset += int64(n)
 		}
+
 		if eof {
 			break
 		}
