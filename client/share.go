@@ -112,6 +112,8 @@ func (c *ShareClient) handleRequest(msg protocol.Message) {
 		c.handleGlob(msg)
 	case protocol.OpGrep:
 		c.handleGrep(msg)
+	case protocol.OpWrite:
+		c.handleWrite(msg)
 	default:
 		c.sendError(msg.ReqID, "unknown operation: "+msg.Op)
 	}
@@ -482,6 +484,59 @@ func (c *ShareClient) handleGrep(msg protocol.Message) {
 	}
 	
 	c.sendResult(msg.ReqID, result)
+}
+
+func (c *ShareClient) handleWrite(msg protocol.Message) {
+	if c.mode == "ro" {
+		c.sendError(msg.ReqID, "read-only share")
+		return
+	}
+
+	// Parse write request from Data field
+	data, ok := msg.Data.(map[string]any)
+	if !ok {
+		c.sendError(msg.ReqID, "invalid write request")
+		return
+	}
+
+	content, _ := data["content"].(string)
+	append_, _ := data["append"].(bool)
+
+	fullPath := c.resolvePath(msg.Path)
+
+	// Ensure parent directory exists
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
+
+	// Decode base64 content
+	decoded, err := base64.StdEncoding.DecodeString(content)
+	if err != nil {
+		c.sendError(msg.ReqID, "invalid content encoding: "+err.Error())
+		return
+	}
+
+	// Write or append
+	var file *os.File
+	if append_ {
+		file, err = os.OpenFile(fullPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	} else {
+		file, err = os.Create(fullPath)
+	}
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
+	defer file.Close()
+
+	n, err := file.Write(decoded)
+	if err != nil {
+		c.sendError(msg.ReqID, err.Error())
+		return
+	}
+
+	c.sendResult(msg.ReqID, map[string]any{"written": n})
 }
 
 func isBinaryFile(path string) bool {

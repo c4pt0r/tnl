@@ -14,6 +14,7 @@ const (
 	OpStat   = "stat"
 	OpGlob   = "glob"
 	OpGrep   = "grep"
+	OpWrite  = "write"  // write content to file
 
 	// Responses
 	OpResult = "result"

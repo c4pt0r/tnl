@@ -404,6 +404,41 @@ func (c *RemoteClient) Remove(path string) error {
 	return nil
 }
 
+func (c *RemoteClient) Write(path string, content []byte, append_ bool) (int, error) {
+	reqID := uuid.New().String()
+
+	err := c.conn.WriteJSON(map[string]any{
+		"op":    protocol.OpWrite,
+		"reqId": reqID,
+		"path":  path,
+		"data": map[string]any{
+			"content": base64.StdEncoding.EncodeToString(content),
+			"append":  append_,
+		},
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	var resp struct {
+		Op    string         `json:"op"`
+		ReqID string         `json:"reqId"`
+		Data  map[string]any `json:"data"`
+		Error string         `json:"error"`
+	}
+
+	if err := c.conn.ReadJSON(&resp); err != nil {
+		return 0, err
+	}
+
+	if resp.Op == protocol.OpError {
+		return 0, fmt.Errorf(resp.Error)
+	}
+
+	written, _ := resp.Data["written"].(float64)
+	return int(written), nil
+}
+
 func (c *RemoteClient) Glob(pattern string) ([]string, error) {
 	reqID := uuid.New().String()
 

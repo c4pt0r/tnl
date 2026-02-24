@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,17 +16,18 @@ import (
 )
 
 var (
-	workerURL    string
-	mode         string
-	recursive    bool
-	progress     bool
-	ignoreCase   bool
-	filesOnly    bool
-	countOnly    bool
-	wordMatch    bool
-	afterContext int
+	workerURL     string
+	mode          string
+	recursive     bool
+	progress      bool
+	ignoreCase    bool
+	filesOnly     bool
+	countOnly     bool
+	wordMatch     bool
+	afterContext  int
 	beforeContext int
-	context      int
+	context       int
+	appendFlag    bool
 )
 
 // Config file structure
@@ -144,6 +146,23 @@ Note: Requires share to be started with --mode=rw`,
 		Run:   runTree,
 	}
 	rootCmd.AddCommand(treeCmd)
+
+	// tee command
+	teeCmd := &cobra.Command{
+		Use:   "tee <shareCode:path>",
+		Short: "Read stdin, write to remote file and stdout",
+		Long: `Read from stdin, write to remote file, and output to stdout.
+
+Examples:
+  echo "hello" | tnl tee ABC123:/file.txt
+  cat data.json | tnl tee ABC123:/data.json
+  
+Note: Requires share to be started with --mode=rw`,
+		Args: cobra.ExactArgs(1),
+		Run:  runTee,
+	}
+	teeCmd.Flags().BoolVarP(&appendFlag, "append", "a", false, "Append to file instead of overwriting")
+	rootCmd.AddCommand(teeCmd)
 
 	// glob command
 	globCmd := &cobra.Command{
@@ -442,6 +461,41 @@ func runRemove(cmd *cobra.Command, args []string) {
 	} else {
 		fmt.Printf("Removed %s\n", path)
 	}
+}
+
+func runTee(cmd *cobra.Command, args []string) {
+	shareCode, path, err := client.ParseRemotePath(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	c, err := client.NewRemoteClient(workerURL, shareCode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer c.Close()
+
+	// Read all from stdin
+	content, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading stdin: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Write to remote
+	written, err := c.Write(path, content, appendFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Output to stdout (like tee)
+	os.Stdout.Write(content)
+
+	// Info to stderr
+	fmt.Fprintf(os.Stderr, "\nWrote %d bytes to %s\n", written, path)
 }
 
 func runGlob(cmd *cobra.Command, args []string) {
