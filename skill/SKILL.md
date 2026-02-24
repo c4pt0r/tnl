@@ -56,11 +56,25 @@ tnl cp -r <code>:/ ./backup          # Copy entire share recursively
 tnl cp -r <code>:/subdir ./local     # Copy subdirectory
 ```
 
-### Writing/Deleting (requires --mode rw)
+### Searching
 ```bash
+tnl grep "TODO" <code>:/             # Search all files
+tnl grep -i "error" <code>:/         # Case insensitive
+tnl grep -l "import" <code>:/        # Only show filenames
+tnl grep -c "func" <code>:/src       # Count matches per file
+tnl grep -w "main" <code>:/          # Whole word match
+
+tnl glob <code>:/*.txt               # Find .txt in root
+tnl glob <code>:/**/*.go             # Find .go recursively
+```
+
+### Writing (requires --mode rw)
+```bash
+echo "hello" | tnl tee <code>:/file.txt    # Write stdin to file
+cat data.json | tnl tee <code>:/data.json  # Pipe to remote
+
 tnl rm <code>:/file.txt        # Delete file
 tnl rm <code>:/subdir          # Delete directory recursively
-# Note: Write via CLI not yet implemented, use web UI
 ```
 
 ### Web Access
