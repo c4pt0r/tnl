@@ -2,7 +2,7 @@
 
 A simple, ephemeral file sharing tool using WebSocket tunnels through Cloudflare Workers.
 
-### 2. Install tnl CLI
+### Install tnl CLI
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
