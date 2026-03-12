@@ -1,6 +1,11 @@
 # tnl - Tunnel File (Directory) Sharing
 
+[![Release](https://github.com/c4pt0r/tnl/actions/workflows/release.yml/badge.svg)](https://github.com/c4pt0r/tnl/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/c4pt0r/tnl)](https://goreportcard.com/report/github.com/c4pt0r/tnl)
+
 A simple, ephemeral file sharing tool using WebSocket tunnels through Cloudflare Workers.
+
+**Supported platforms:** Linux (amd64, arm64), macOS (amd64, arm64), Windows (amd64)
 
 ### Install tnl CLI
 
