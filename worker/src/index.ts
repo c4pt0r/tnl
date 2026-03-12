@@ -345,7 +345,8 @@ async function handleWebUI(request: Request, env: Env, url: URL, code: string): 
     const data = await result.json() as any;
     
     if (data.error) {
-      return new Response(renderHTML(code, path, null, data.error, null, null), {
+      const errorMsg = data.debug ? `${data.error} (debug: hasWs=${data.debug.hasWs}, readyState=${data.debug.readyState})` : data.error;
+      return new Response(renderHTML(code, path, null, errorMsg, null, null), {
         headers: { 'Content-Type': 'text/html' },
       });
     }
@@ -444,8 +445,13 @@ export class ShareDO {
     let download = url.searchParams.get('download') === '1';
     const raw = url.searchParams.get('raw') === '1';
     
+    // Debug: log WebSocket state
+    console.log('handleWebUIRequest - sharerWs:', this.sharerWs ? 'exists' : 'null', 
+                'readyState:', this.sharerWs?.readyState, 
+                'WebSocket.OPEN:', WebSocket.OPEN);
+    
     if (!this.sharerWs || this.sharerWs.readyState !== WebSocket.OPEN) {
-      return Response.json({ error: 'Share not available' });
+      return Response.json({ error: 'Share not available', debug: { hasWs: !!this.sharerWs, readyState: this.sharerWs?.readyState } });
     }
     
     const reqId = crypto.randomUUID();
@@ -525,16 +531,59 @@ export class ShareDO {
         if (!readResult.content) {
           return Response.json({ error: 'File content not received from client' });
         }
-
-        let content: string;
+        
+        const fileName = path.split('/').pop() || 'file';
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        
+        // Decode base64 to bytes
+        let binaryStr: string;
         try {
-          content = atob(readResult.content);
+          binaryStr = atob(readResult.content);
         } catch (e) {
           return Response.json({ error: 'Invalid file content encoding: ' + (e as Error).message });
         }
-
+        
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        
+        // Check if content looks like text (no null bytes, mostly printable)
+        const textExts = ['txt', 'md', 'json', 'yaml', 'yml', 'toml', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'rb', 'java', 'c', 'cpp', 'h', 'hpp', 'sh', 'bash', 'sql', 'log', 'conf', 'cfg', 'ini', 'env', 'gitignore', 'dockerfile', 'makefile', 'csv', 'tsv'];
+        const isTextExt = textExts.includes(ext) || ext === '';
+        
+        // Check for binary content (null bytes or too many non-printable chars)
+        let nullCount = 0;
+        let nonPrintable = 0;
+        const checkLen = Math.min(bytes.length, 8000);
+        for (let i = 0; i < checkLen; i++) {
+          if (bytes[i] === 0) nullCount++;
+          else if (bytes[i] < 9 || (bytes[i] > 13 && bytes[i] < 32 && bytes[i] !== 27)) nonPrintable++;
+        }
+        const isBinary = nullCount > 0 || (checkLen > 0 && nonPrintable / checkLen > 0.1);
+        
+        if (isBinary && !isTextExt) {
+          return Response.json({ 
+            content: `[Binary file - ${formatSize(bytes.length)}]\n\nUse the Download button to view this file.`, 
+            name: fileName,
+            binary: true
+          });
+        }
+        
+        // Decode as UTF-8 text
+        let content: string;
+        try {
+          content = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+        } catch {
+          return Response.json({ 
+            content: `[Unable to decode file as text]\n\nUse the Download button to view this file.`, 
+            name: fileName,
+            binary: true
+          });
+        }
+        
         const preview = content.length > 100000 ? content.slice(0, 100000) + '\n\n... (truncated)' : content;
-
+        
         return Response.json({ content: preview, name: fileName });
       }
     }
@@ -565,8 +614,10 @@ export class ShareDO {
   }
   
   handleSharer(ws: WebSocket) {
+    console.log('handleSharer called, setting sharerWs');
     (ws as any).accept();
     this.sharerWs = ws;
+    console.log('sharerWs set, readyState:', ws.readyState);
     
     ws.addEventListener('message', async (event) => {
       try {
@@ -633,7 +684,8 @@ export class ShareDO {
       }
     });
     
-    ws.addEventListener('close', () => {
+    ws.addEventListener('close', (event) => {
+      console.log('Sharer WebSocket closed, code:', (event as any).code, 'reason:', (event as any).reason);
       this.sharerWs = null;
       for (const [, accessorWs] of this.accessorWs) {
         accessorWs.close(1000, 'Sharer disconnected');
