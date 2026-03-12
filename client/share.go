@@ -13,9 +13,17 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/c4pt0r/tnl/protocol"
 	"github.com/gorilla/websocket"
+)
+
+const (
+	// Ping interval - must be less than CF's idle timeout (~100s)
+	pingInterval = 30 * time.Second
+	// Pong wait - how long to wait for pong after ping
+	pongWait = 10 * time.Second
 )
 
 type ShareClient struct {
@@ -80,11 +88,44 @@ func (c *ShareClient) Register() (shareCode, publicURL string, err error) {
 }
 
 func (c *ShareClient) Serve() error {
+	// Set up pong handler to reset read deadline
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
+		return nil
+	})
+
+	// Start ping goroutine to keep connection alive
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(pingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.mu.Lock()
+				err := c.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(pongWait))
+				c.mu.Unlock()
+				if err != nil {
+					return
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+	defer close(done)
+
+	// Set initial read deadline
+	c.conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
+
 	for {
 		_, msgBytes, err := c.conn.ReadMessage()
 		if err != nil {
 			return fmt.Errorf("connection closed: %w", err)
 		}
+
+		// Reset read deadline on any message
+		c.conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
 
 		var msg protocol.Message
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
