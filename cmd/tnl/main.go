@@ -15,6 +15,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	defaultPublicWorkerURL = "wss://tnl.db9.workers.dev/ws"
+	legacyPublicWorkerURL  = "wss://tnl.dongxuhuang.workers.dev/ws"
+)
+
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
+
 var (
 	workerURL     string
 	mode          string
@@ -35,11 +46,22 @@ type Config struct {
 	WorkerURL string `json:"worker_url"`
 }
 
+func normalizeWorkerURL(url string) string {
+	switch strings.TrimSpace(url) {
+	case "":
+		return ""
+	case legacyPublicWorkerURL:
+		return defaultPublicWorkerURL
+	default:
+		return url
+	}
+}
+
 // getDefaultWorkerURL returns worker URL from env, config file, or empty string
 func getDefaultWorkerURL() string {
 	// 1. Environment variable takes priority
 	if url := os.Getenv("TNL_WORKER_URL"); url != "" {
-		return url
+		return normalizeWorkerURL(url)
 	}
 
 	// 2. Try config file
@@ -52,16 +74,18 @@ func getDefaultWorkerURL() string {
 		if data, err := os.ReadFile(path); err == nil {
 			var cfg Config
 			if json.Unmarshal(data, &cfg) == nil && cfg.WorkerURL != "" {
-				return cfg.WorkerURL
+				return normalizeWorkerURL(cfg.WorkerURL)
 			}
 		}
 	}
 
-	// 3. No default - must be configured
-	return ""
+	// 3. Fall back to the public worker
+	return defaultPublicWorkerURL
 }
 
 func main() {
+	versionText := fmt.Sprintf("%s\ncommit: %s\nbuilt:  %s", version, commit, buildDate)
+
 	rootCmd := &cobra.Command{
 		Use:   "tnl",
 		Short: "Tunnel-based file sharing tool",
@@ -71,7 +95,10 @@ Configure worker URL via:
   1. Command line: --worker wss://your-worker.workers.dev/ws
   2. Environment:  export TNL_WORKER_URL=wss://...
   3. Config file:  ~/.tnl/config.json or ~/.config/tnl/config.json
-     {"worker_url": "wss://your-worker.workers.dev/ws"}`,
+     {"worker_url": "wss://your-worker.workers.dev/ws"}
+
+If not configured, tnl uses the public worker:
+  ` + defaultPublicWorkerURL,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if workerURL == "" {
 				return fmt.Errorf("worker URL not configured.\n\nSet via:\n  --worker wss://...\n  TNL_WORKER_URL=wss://...\n  ~/.tnl/config.json")
@@ -79,9 +106,21 @@ Configure worker URL via:
 			return nil
 		},
 	}
+	rootCmd.Version = versionText
 
 	rootCmd.PersistentFlags().StringVar(&workerURL, "worker", getDefaultWorkerURL(), "Worker WebSocket URL")
 	rootCmd.PersistentFlags().BoolVarP(&progress, "progress", "p", true, "Show progress bar")
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show version information",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(versionText)
+		},
+	}
+	versionCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error { return nil }
+	rootCmd.AddCommand(versionCmd)
 
 	// share command
 	shareCmd := &cobra.Command{
@@ -229,7 +268,7 @@ Examples:
 	initCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		fmt.Println("Initialize tnl config with your worker URL.\n")
 		fmt.Println("Usage:")
-		fmt.Println("  tnl init wss://tnl.your-account.workers.dev/ws")
+		fmt.Printf("  tnl init %s\n", defaultPublicWorkerURL)
 	})
 	// Skip PersistentPreRunE for init command
 	initCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error { return nil }

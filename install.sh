@@ -6,6 +6,8 @@ set -e
 
 REPO="c4pt0r/tnl"
 INSTALL_DIR="${TNL_INSTALL_DIR:-/usr/local/bin}"
+CHANNEL="${TNL_CHANNEL:-nightly}"
+NIGHTLY_TAG="nightly"
 
 # Detect OS and architecture
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -24,12 +26,16 @@ case "$OS" in
   *)      echo "Unsupported OS: $OS"; exit 1 ;;
 esac
 
-# Get latest release tag
-echo "Fetching latest release..."
-LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+if [ "$CHANNEL" = "stable" ]; then
+  echo "Fetching latest stable release..."
+  LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*\"([^\"]+)\".*/\1/')
+else
+  echo "Fetching latest nightly build..."
+  LATEST="$NIGHTLY_TAG"
+fi
 
 if [ -z "$LATEST" ]; then
-  echo "Failed to get latest release. Trying to build from source..."
+  echo "Failed to get release metadata. Trying to build from source..."
   
   # Fallback: build from source
   if ! command -v go &> /dev/null; then
@@ -41,7 +47,7 @@ if [ -z "$LATEST" ]; then
   cd "$TMP_DIR"
   git clone --depth 1 "https://github.com/$REPO.git" tnl
   cd tnl
-  go build -ldflags="-s -w" -o tnl ./cmd/tnl
+  go build -ldflags="-s -w -X main.version=dev -X main.commit=$(git rev-parse --short HEAD) -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o tnl ./cmd/tnl
   
   if [ -w "$INSTALL_DIR" ]; then
     mv tnl "$INSTALL_DIR/tnl"
@@ -71,5 +77,7 @@ fi
 echo "✓ tnl $LATEST installed to $INSTALL_DIR/tnl"
 echo ""
 echo "Get started:"
-echo "  tnl init wss://your-worker.workers.dev/ws"
+echo "  tnl init wss://tnl.db9.workers.dev/ws"
 echo "  tnl share ./myfile"
+echo ""
+echo "Installed channel: $CHANNEL"

@@ -13,6 +13,14 @@ A simple, ephemeral file sharing tool using WebSocket tunnels through Cloudflare
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
 ```
 
+This installer now defaults to the `nightly` channel.
+
+Install the latest stable release instead:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
+```
+
 **User A shares:**
 ```bash
 $ tnl share ./mydir
@@ -145,7 +153,7 @@ npx wrangler deploy
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
 ```
 
-This auto-detects your OS/architecture and installs the latest release.
+This auto-detects your OS/architecture and installs the latest nightly build by default.
 
 #### Option B: Go Install
 
@@ -166,26 +174,49 @@ sudo mv tnl /usr/local/bin/
 
 Check [Releases](https://github.com/c4pt0r/tnl/releases) for pre-built binaries.
 
+Nightly builds are published to the `nightly` release tag.
+
 ### 3. Configure CLI
 
 Configure your worker URL (choose one method):
 
 ```bash
-# Method 1: Quick init (recommended)
+# Method 1: Use the public worker (quick start)
+tnl init wss://tnl.db9.workers.dev/ws
+
+# Method 2: Your own worker
 tnl init wss://tnl.YOUR_ACCOUNT.workers.dev/ws
 
-# Method 2: Environment variable
+# Method 3: Environment variable
 export TNL_WORKER_URL=wss://tnl.YOUR_ACCOUNT.workers.dev/ws
 
-# Method 3: Config file
+# Method 4: Config file
 mkdir -p ~/.tnl
 echo '{"worker_url": "wss://tnl.YOUR_ACCOUNT.workers.dev/ws"}' > ~/.tnl/config.json
 
-# Method 4: Command line flag (per-command)
+# Method 5: Command line flag (per-command)
 tnl share ./dir --worker wss://tnl.YOUR_ACCOUNT.workers.dev/ws
 ```
 
+If no worker URL is configured, current builds fall back to the public worker:
+
+```bash
+wss://tnl.db9.workers.dev/ws
+```
+
 ## Usage
+
+### Show version
+```bash
+tnl version
+```
+
+Example output:
+```text
+nightly-20260320
+commit: abc1234
+built:  2026-03-20T08:00:00Z
+```
 
 ### Share a directory (read-only)
 ```bash

@@ -1,9 +1,11 @@
-name: Release
+name: Nightly
 
 on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches: [master, main]
 
 permissions:
   contents: write
@@ -40,7 +42,7 @@ jobs:
 
       - name: Compute build metadata
         run: |
-          echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          echo "VERSION=nightly-$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
           echo "COMMIT=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
@@ -67,8 +69,14 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create Release
+      - name: Publish nightly release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: nightly
+          name: Nightly Build
+          prerelease: true
+          make_latest: false
+          generate_release_notes: false
+          body: |
+            Automated nightly build from `${{ github.sha }}`.
           files: artifacts/**/*
-          generate_release_notes: true

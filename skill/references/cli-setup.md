@@ -8,6 +8,14 @@ Preferred install:
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
 ```
 
+This installer defaults to the nightly channel.
+
+Install stable explicitly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
+```
+
 Alternative install:
 
 ```bash
@@ -20,6 +28,12 @@ Build from source:
 git clone https://github.com/c4pt0r/tnl.git
 cd tnl
 go build -o tnl ./cmd/tnl
+```
+
+Check installed version:
+
+```bash
+tnl version
 ```
 
 ## Configure worker URL

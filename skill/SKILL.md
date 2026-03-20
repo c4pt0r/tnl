@@ -35,6 +35,8 @@ Reach for this skill when the user says things like:
 - If you need local processing, copy only the necessary files with `tnl cp` or `tnl cp -r`.
 - Treat a tnl share as ephemeral. If commands fail with availability errors, assume the sharer disconnected and ask the user to re-run `tnl share`.
 - If the user only needs setup help, do not force a deployment path. Offer public-worker setup first unless they explicitly want their own backend.
+- Prefer the nightly install path for public onboarding unless the user explicitly asks for a stable release.
+- When checking what binary a user has, ask for `tnl version` rather than inferring from install time.
 
 ## Default workflow
 
@@ -44,6 +46,7 @@ Pick one path first:
 
 - `consume-share`: the user already has a share code or can start sharing now
 - `setup-cli`: the user needs `tnl` installed and configured
+- `release-management`: the user needs versioning, release, or nightly-build changes
 - `deploy-backend`: the user wants their own Cloudflare Worker
 - `troubleshoot`: an existing setup or share is failing
 
@@ -135,7 +138,10 @@ If setup is the issue, read [cli-setup.md](references/cli-setup.md).
 
 If deployment is the issue, read [worker-deploy.md](references/worker-deploy.md).
 
+If the task is about release channels, installer behavior, or version output, read [release-and-nightly.md](references/release-and-nightly.md).
+
 ## References
 
 - Read [cli-setup.md](references/cli-setup.md) for installation, config, and command patterns.
 - Read [worker-deploy.md](references/worker-deploy.md) when the user wants a dedicated Cloudflare Worker backend.
+- Read [release-and-nightly.md](references/release-and-nightly.md) for versioning, GitHub Releases, and nightly channel behavior.
