@@ -55,26 +55,42 @@ Pick one path first:
 Run this flow:
 
 1. Confirm whether the user already has `tnl` installed.
-2. If not, use the install flow in [cli-setup.md](references/cli-setup.md).
-3. Confirm the CLI has a worker URL configured.
-4. Ask the user to start a read-only share unless writes are required:
+2. If not, tell the user to install `tnl` with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+```
+
+3. If they explicitly want the stable channel instead of nightly, use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
+```
+
+4. Ask the user to verify the install with:
+
+```bash
+tnl version
+```
+5. Confirm the CLI has a worker URL configured.
+6. Ask the user to start a read-only share unless writes are required:
 
 ```bash
 tnl share /path/to/project
 ```
 
-5. Ask the user to send either:
+7. Ask the user to send either:
    - the `Share code`
    - or the `Public URL`
-6. If they send the public URL, extract the `code=` value and use that as the remote prefix.
-7. Start with:
+8. If they send the public URL, extract the `code=` value and use that as the remote prefix.
+9. Start with:
 
 ```bash
 tnl ls <code>:/
 tnl tree <code>:/
 ```
 
-8. Inspect targeted files with:
+10. Inspect targeted files with:
 
 ```bash
 tnl cat <code>:/path/to/file
@@ -82,7 +98,7 @@ tnl grep "pattern" <code>:/
 tnl glob <code>:/**/*.ts
 ```
 
-9. Copy only what you need:
+11. Copy only what you need:
 
 ```bash
 tnl cp <code>:/path/to/file ./local-file
@@ -142,6 +158,6 @@ If the task is about release channels, installer behavior, or version output, re
 
 ## References
 
-- Read [cli-setup.md](references/cli-setup.md) for installation, config, and command patterns.
+- Read [cli-setup.md](references/cli-setup.md) for the `curl` install flow, config, and command patterns.
 - Read [worker-deploy.md](references/worker-deploy.md) when the user wants a dedicated Cloudflare Worker backend.
 - Read [release-and-nightly.md](references/release-and-nightly.md) for versioning, GitHub Releases, and nightly channel behavior.

@@ -2,7 +2,7 @@
 
 ## Install
 
-Preferred install:
+Default install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
@@ -14,20 +14,6 @@ Install stable explicitly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
-```
-
-Alternative install:
-
-```bash
-go install github.com/c4pt0r/tnl/cmd/tnl@latest
-```
-
-Build from source:
-
-```bash
-git clone https://github.com/c4pt0r/tnl.git
-cd tnl
-go build -o tnl ./cmd/tnl
 ```
 
 Check installed version:
