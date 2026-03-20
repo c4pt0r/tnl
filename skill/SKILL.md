@@ -1,13 +1,18 @@
 ---
 name: tnl
-description: Help a coding agent use tnl to get temporary access to a user's local files or directories, inspect a shared codebase through a share code, guide the user through tnl install/init/share, or deploy/configure a dedicated Cloudflare Worker backend for tnl. Use when the user wants to share files with the agent without pushing to git, paste a tnl share code or public URL, or ask for tnl setup/troubleshooting.
+description: Help a coding agent use tnl to get temporary access to a user's local files or directories, inspect a shared codebase through a share code, guide the user through tnl install/init/share, or deploy/configure a dedicated Cloudflare Worker backend for tnl.
+metadata: { "openclaw": { "emoji": "🕳️" } }
 ---
 
 # tnl
 
-`tnl` is a tunnel-based file and directory sharing tool for short-lived remote access.
+insatall `tnl`, tnl is a tunnel-based file and directory sharing tool for short-lived remote access. you should install it first
 
-Use it to let a coding agent inspect a local folder without requiring git push, zip upload, SSH, or a persistent server.
+```bash
+curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+```
+
+Use it to let an agent inspect a local folder without requiring git push, zip upload, SSH, or a persistent server.
 
 The normal model is:
 
@@ -29,8 +34,12 @@ Reach for this skill when the user says things like:
 
 ## Working rules
 
-- Prefer a share code such as `ABC123defg:/` over the browser URL when you need CLI access.
+- Clarify **who is sharing and who is consuming**:
+  - If the *user* wants to share their machine → they run `tnl share ...` and send a code.
+  - If the *agent host* is sharing (for debugging/demo) → the agent runs `tnl share ...` and sends a code.
+- Prefer a share code such as `ABC123defg` (use as `ABC123defg:/`) over the browser URL when you need CLI access.
 - Prefer `--mode ro` by default. Ask for `--mode rw` only when the task truly requires remote writes or deletes.
+- Prefer **absolute paths** or `$HOME/...` (avoid ambiguous inputs like `home`).
 - Keep file access minimal. Use `tnl ls`, `tnl tree`, `tnl cat`, `tnl grep`, and `tnl glob` before copying large directories.
 - If you need local processing, copy only the necessary files with `tnl cp` or `tnl cp -r`.
 - Treat a tnl share as ephemeral. If commands fail with availability errors, assume the sharer disconnected and ask the user to re-run `tnl share`.
@@ -40,7 +49,7 @@ Reach for this skill when the user says things like:
 
 ## Default workflow
 
-### 1. Identify the task shape
+### 1) Identify the task shape
 
 Pick one path first:
 
@@ -50,9 +59,7 @@ Pick one path first:
 - `deploy-backend`: the user wants their own Cloudflare Worker
 - `troubleshoot`: an existing setup or share is failing
 
-### 2. If the user wants to share files with the agent
-
-Run this flow:
+### 2) If the user wants to share files with the agent
 
 1. Confirm whether the user already has `tnl` installed.
 2. If not, tell the user to install `tnl` with:
@@ -61,28 +68,30 @@ Run this flow:
 curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
 ```
 
-3. If they explicitly want the stable channel instead of nightly, use:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
-```
-
 4. Ask the user to verify the install with:
 
 ```bash
 tnl version
 ```
-5. Confirm the CLI has a worker URL configured.
-6. Ask the user to start a read-only share unless writes are required:
+
+5. Confirm the CLI has a worker URL configured (recommended):
 
 ```bash
-tnl share /path/to/project
+tnl init wss://<worker-host>/ws
+```
+
+6. Ask the user to start a read-only share unless writes are required (prefer `$HOME/...` or an absolute path):
+
+```bash
+tnl share "$HOME/path/to/project"
 ```
 
 7. Ask the user to send either:
-   - the `Share code`
+   - the `Share code` (e.g. `ABC123defg`)
    - or the `Public URL`
-8. If they send the public URL, extract the `code=` value and use that as the remote prefix.
+8. Normalize the code for CLI use:
+   - Share code `ABC123defg` → remote prefix `ABC123defg:/`
+   - Public URL `...?code=ABC123defg` → remote prefix `ABC123defg:/`
 9. Start with:
 
 ```bash
@@ -105,7 +114,7 @@ tnl cp <code>:/path/to/file ./local-file
 tnl cp -r <code>:/subdir ./local-dir
 ```
 
-### 3. If remote writes are required
+### 3) If remote writes are required
 
 Only ask for `rw` when the task requires creating, replacing, appending, or deleting files in the shared directory.
 
@@ -128,14 +137,14 @@ State explicitly that anyone with the share code can perform those writes while 
 
 ## Definition of done
 
-For setup tasks, do not stop at installation. The task is complete only when:
+For setup tasks:
 
 1. `tnl` is installed or built successfully
 2. a worker URL is configured
 3. a real share can be started
 4. at least one access command succeeds against the share
 
-For share-consumption tasks, do not claim success until:
+For share-consumption tasks:
 
 1. you have the live share code
 2. you can read the target path with `tnl ls`, `tnl tree`, or `tnl cat`
@@ -143,21 +152,21 @@ For share-consumption tasks, do not claim success until:
 
 ## Failure handling
 
-Use these quick interpretations:
+Quick interpretations:
 
 - `worker URL not configured`: initialize config or set `TNL_WORKER_URL`
 - `share not available`: the sharer stopped or the code is wrong
 - `read-only share`: the user started `ro` mode but the task needs `rw`
 - `path outside share root`: access escaped the shared root or hit a blocked symlink
 
-If setup is the issue, read [cli-setup.md](references/cli-setup.md).
+If setup is the issue, read [references/cli-setup.md](references/cli-setup.md).
 
-If deployment is the issue, read [worker-deploy.md](references/worker-deploy.md).
+If deployment is the issue, read [references/worker-deploy.md](references/worker-deploy.md).
 
-If the task is about release channels, installer behavior, or version output, read [release-and-nightly.md](references/release-and-nightly.md).
+If the task is about release channels, installer behavior, or version output, read [references/release-and-nightly.md](references/release-and-nightly.md).
 
 ## References
 
-- Read [cli-setup.md](references/cli-setup.md) for the `curl` install flow, config, and command patterns.
-- Read [worker-deploy.md](references/worker-deploy.md) when the user wants a dedicated Cloudflare Worker backend.
-- Read [release-and-nightly.md](references/release-and-nightly.md) for versioning, GitHub Releases, and nightly channel behavior.
+- [references/cli-setup.md](references/cli-setup.md)
+- [references/worker-deploy.md](references/worker-deploy.md)
+- [references/release-and-nightly.md](references/release-and-nightly.md)
