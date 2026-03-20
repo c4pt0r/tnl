@@ -1,0 +1,4 @@
+interface:
+  display_name: "TNL"
+  short_description: "Use tnl to share and inspect remote files"
+  default_prompt: "Use $tnl to help me set up a share or inspect files through a tnl share code."

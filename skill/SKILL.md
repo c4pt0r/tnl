@@ -1,160 +1,141 @@
 ---
 name: tnl
-description: Install and deploy tnl (tunnel-based ephemeral file sharing). Use when user wants to share files temporarily, set up tnl CLI, or deploy their own tnl Cloudflare Worker server.
+description: Help a coding agent use tnl to get temporary access to a user's local files or directories, inspect a shared codebase through a share code, guide the user through tnl install/init/share, or deploy/configure a dedicated Cloudflare Worker backend for tnl. Use when the user wants to share files with the agent without pushing to git, paste a tnl share code or public URL, or ask for tnl setup/troubleshooting.
 ---
 
-# tnl - Tunnel File Sharing
+# tnl
 
-Ephemeral file sharing via WebSocket tunnels. Share files from CLI, access via web or CLI.
+`tnl` is a tunnel-based file and directory sharing tool for short-lived remote access.
 
-## Setup Flow
+Use it to let a coding agent inspect a local folder without requiring git push, zip upload, SSH, or a persistent server.
 
-**Before installing, ask user:**
-> Do you want to deploy your own tnl server, or use the public server?
-> - **Public server**: Quick setup, no Cloudflare account needed
-> - **Own server**: Full control, requires Cloudflare account + API token
+The normal model is:
 
-### Option A: Use Public Server (Quick)
+1. The user runs `tnl share <path>` on their machine.
+2. The user sends the share code or public URL.
+3. The agent uses `tnl` commands against `<code>:/...` to inspect or copy what it needs.
 
-```bash
-# Install CLI
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+## Trigger patterns
 
-# Configure to use public server
-tnl init wss://tnl.dongxuhuang.workers.dev/ws
-```
+Reach for this skill when the user says things like:
 
-### Option B: Deploy Own Server
+- "use tnl"
+- "share my local repo"
+- "I can give you a share code"
+- "inspect files from my machine"
+- "set up tnl"
+- "deploy a tnl worker"
+- "tnl is not working"
 
-See [Deploy Own Server](#deploy-own-server-cloudflare-worker) section below, then install CLI.
+## Working rules
 
-## Usage
+- Prefer a share code such as `ABC123defg:/` over the browser URL when you need CLI access.
+- Prefer `--mode ro` by default. Ask for `--mode rw` only when the task truly requires remote writes or deletes.
+- Keep file access minimal. Use `tnl ls`, `tnl tree`, `tnl cat`, `tnl grep`, and `tnl glob` before copying large directories.
+- If you need local processing, copy only the necessary files with `tnl cp` or `tnl cp -r`.
+- Treat a tnl share as ephemeral. If commands fail with availability errors, assume the sharer disconnected and ask the user to re-run `tnl share`.
+- If the user only needs setup help, do not force a deployment path. Offer public-worker setup first unless they explicitly want their own backend.
 
-### Sharing (host side)
-```bash
-tnl share ./mydir              # Read-only (default)
-tnl share ./mydir --mode rw    # Read-write (dangerous!)
-# Press Ctrl+C to stop sharing
-```
+## Default workflow
 
-### Browsing
-```bash
-tnl ls <code>:/                # List with permissions, size, date
-tnl ls <code>:/subdir          # List subdirectory
-tnl tree <code>:/              # Recursive tree with sizes
-```
+### 1. Identify the task shape
 
-### Reading
-```bash
-tnl cat <code>:/file.txt       # Print to stdout
-tnl cat <code>:/file.txt > out # Redirect to file
-```
+Pick one path first:
 
-### Copying
-```bash
-tnl cp <code>:/file.txt ./         # Copy to current dir
-tnl cp <code>:/file.txt ./new.txt  # Copy with rename
-tnl cp -r <code>:/ ./backup        # Recursive copy
-tnl cp -r <code>:/src ./           # Copy subdir
-# Supports scp-like path behavior
-```
+- `consume-share`: the user already has a share code or can start sharing now
+- `setup-cli`: the user needs `tnl` installed and configured
+- `deploy-backend`: the user wants their own Cloudflare Worker
+- `troubleshoot`: an existing setup or share is failing
 
-### Searching
-```bash
-# grep - regex search
-tnl grep "pattern" <code>:/        # Search all files
-tnl grep -i "error" <code>:/       # Case insensitive
-tnl grep -w "main" <code>:/        # Whole word only
-tnl grep -l "import" <code>:/      # List filenames only
-tnl grep -c "func" <code>:/        # Count matches per file
-tnl grep -A 3 "TODO" <code>:/      # 3 lines after match
-tnl grep -B 2 "TODO" <code>:/      # 2 lines before match
-tnl grep -C 2 "TODO" <code>:/      # 2 lines context (before+after)
+### 2. If the user wants to share files with the agent
 
-# glob - pattern matching
-tnl glob <code>:/*.txt             # .txt in root
-tnl glob <code>:/**/*.go           # .go files recursively
-tnl glob <code>:/src/*.{js,ts}     # Multiple extensions
-```
+Run this flow:
 
-### Writing (requires --mode rw)
-```bash
-# tee - write stdin to remote (and stdout)
-echo "hello" | tnl tee <code>:/file.txt      # Write/overwrite
-cat log.txt | tnl tee -a <code>:/log.txt     # Append mode
-
-# rm - delete
-tnl rm <code>:/file.txt            # Delete file
-tnl rm -r <code>:/subdir           # Delete directory recursively
-```
-
-### Web Access
-Share URL printed on `tnl share`. Features:
-- Directory browsing
-- Syntax highlighting (JS/TS/Go/Python/Rust/JSON/YAML...)
-- Line numbers
-- Raw view / Download buttons
-
-### Global Flags
-```bash
---worker <url>   # Override server URL
--p, --progress   # Show progress bar (default: true)
-```
-
-## Deploy Own Server (Cloudflare Worker)
-
-Requires: Cloudflare account + API token with Workers permissions.
-
-### Interactive Setup
-
-Ask user for:
-1. **Cloudflare API Token** - From https://dash.cloudflare.com/profile/api-tokens
-   - Create token with "Edit Cloudflare Workers" permission
-2. **Worker name** (optional, default: `tnl`)
-
-### Deployment Steps
+1. Confirm whether the user already has `tnl` installed.
+2. If not, use the install flow in [cli-setup.md](references/cli-setup.md).
+3. Confirm the CLI has a worker URL configured.
+4. Ask the user to start a read-only share unless writes are required:
 
 ```bash
-# Clone repo
-git clone https://github.com/c4pt0r/tnl.git
-cd tnl/worker
-
-# Install wrangler if needed
-npm install -g wrangler
-
-# Store token securely
-echo "CLOUDFLARE_API_TOKEN=<user-token>" > .dev.vars
-chmod 600 .dev.vars
-
-# Deploy
-source .dev.vars && export CLOUDFLARE_API_TOKEN && npx wrangler deploy
-
-# Configure CLI to use new server
-tnl init wss://<worker-name>.<account>.workers.dev/ws
+tnl share /path/to/project
 ```
 
-### Custom Domain (Optional)
+5. Ask the user to send either:
+   - the `Share code`
+   - or the `Public URL`
+6. If they send the public URL, extract the `code=` value and use that as the remote prefix.
+7. Start with:
 
-In `wrangler.toml`, add:
-```toml
-[vars]
-PUBLIC_URL = "https://share.example.com"
-
-[[routes]]
-pattern = "share.example.com/*"
+```bash
+tnl ls <code>:/
+tnl tree <code>:/
 ```
 
-## Troubleshooting
+8. Inspect targeted files with:
 
-| Issue | Fix |
-|-------|-----|
-| `share not available` | Sharer disconnected or wrong code |
-| `read-only share` | Use `--mode rw` when sharing |
-| `path outside share root` | Symlink escape blocked (security) |
+```bash
+tnl cat <code>:/path/to/file
+tnl grep "pattern" <code>:/
+tnl glob <code>:/**/*.ts
+```
 
-## Security Notes
+9. Copy only what you need:
 
-- Share codes are cryptographically random (52^10 entropy)
-- Symlinks are validated to prevent escape
-- XSS/header injection protected
-- **rw mode is dangerous** - anyone with code can delete files
+```bash
+tnl cp <code>:/path/to/file ./local-file
+tnl cp -r <code>:/subdir ./local-dir
+```
+
+### 3. If remote writes are required
+
+Only ask for `rw` when the task requires creating, replacing, appending, or deleting files in the shared directory.
+
+Use:
+
+```bash
+tnl share /path/to/project --mode rw
+```
+
+Then operate carefully with:
+
+```bash
+echo "content" | tnl tee <code>:/path/to/file
+cat patch.txt | tnl tee -a <code>:/path/to/file
+tnl rm <code>:/path/to/file
+tnl rm -r <code>:/path/to/dir
+```
+
+State explicitly that anyone with the share code can perform those writes while the share is live.
+
+## Definition of done
+
+For setup tasks, do not stop at installation. The task is complete only when:
+
+1. `tnl` is installed or built successfully
+2. a worker URL is configured
+3. a real share can be started
+4. at least one access command succeeds against the share
+
+For share-consumption tasks, do not claim success until:
+
+1. you have the live share code
+2. you can read the target path with `tnl ls`, `tnl tree`, or `tnl cat`
+3. any required file copy or remote write has been verified
+
+## Failure handling
+
+Use these quick interpretations:
+
+- `worker URL not configured`: initialize config or set `TNL_WORKER_URL`
+- `share not available`: the sharer stopped or the code is wrong
+- `read-only share`: the user started `ro` mode but the task needs `rw`
+- `path outside share root`: access escaped the shared root or hit a blocked symlink
+
+If setup is the issue, read [cli-setup.md](references/cli-setup.md).
+
+If deployment is the issue, read [worker-deploy.md](references/worker-deploy.md).
+
+## References
+
+- Read [cli-setup.md](references/cli-setup.md) for installation, config, and command patterns.
+- Read [worker-deploy.md](references/worker-deploy.md) when the user wants a dedicated Cloudflare Worker backend.
