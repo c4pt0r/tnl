@@ -10,7 +10,7 @@ A simple, ephemeral file sharing tool using WebSocket tunnels through Cloudflare
 ### Install tnl CLI
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+curl -fsSL tnl.db9.workers.dev/install.sh | sh
 ```
 
 This installer now defaults to the `nightly` channel.
@@ -18,7 +18,7 @@ This installer now defaults to the `nightly` channel.
 Install the latest stable release instead:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
+curl -fsSL tnl.db9.workers.dev/install.sh | TNL_CHANNEL=stable sh
 ```
 
 **User A shares:**
@@ -150,7 +150,7 @@ npx wrangler deploy
 #### Option A: Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+curl -fsSL tnl.db9.workers.dev/install.sh | sh
 ```
 
 This auto-detects your OS/architecture and installs the latest nightly build by default.
