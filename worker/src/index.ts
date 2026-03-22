@@ -284,6 +284,18 @@ export default {
       return handleWebUI(request, env, url, code);
     }
     
+    // Serve skill.md
+    if (url.pathname === '/skill.md') {
+      const skillUrl = 'https://raw.githubusercontent.com/c4pt0r/tnl/master/skill/SKILL.md';
+      const resp = await fetch(skillUrl, { cf: { cacheTtl: 300 } });
+      if (!resp.ok) {
+        return new Response('Failed to fetch skill.md', { status: 502 });
+      }
+      return new Response(resp.body, {
+        headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+      });
+    }
+
     // Landing page
     if (url.pathname === '/') {
       return new Response(`<!DOCTYPE html>
@@ -293,10 +305,10 @@ export default {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tnl - Tunnel File Sharing</title>
   <style>
-    body { 
+    body {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      max-width: 600px; 
-      margin: 100px auto; 
+      max-width: 600px;
+      margin: 100px auto;
       padding: 20px;
       text-align: center;
     }
@@ -304,6 +316,26 @@ export default {
     .subtitle { color: #666; font-size: 1.2em; }
     code { background: #f0f0f0; padding: 10px 15px; border-radius: 5px; display: inline-block; margin: 10px 0; }
     a { color: #0066cc; }
+    .onboard {
+      margin-top: 40px;
+      padding: 24px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      text-align: left;
+    }
+    .onboard h2 { font-size: 1.2em; margin: 0 0 12px 0; }
+    .onboard p { color: #444; margin: 8px 0; line-height: 1.6; }
+    .onboard code {
+      display: block;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      padding: 12px 15px;
+      font-size: 0.9em;
+      text-align: left;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
@@ -312,9 +344,14 @@ export default {
   <p>Share files instantly from your terminal:</p>
   <code>tnl share ./mydir</code>
   <p style="margin-top: 30px;">
-    <a href="https://github.com/c4pt0r/tnl">GitHub</a> · 
+    <a href="https://github.com/c4pt0r/tnl">GitHub</a> ·
     <a href="https://github.com/c4pt0r/tnl/releases">Download CLI</a>
   </p>
+  <div class="onboard">
+    <h2>🤖 Send Your AI Agent to tnl</h2>
+    <p>Let your AI agent access your local files through tnl — no git push, no zip upload, no SSH needed.</p>
+    <code>Read https://tnl.db9.workers.dev/skill.md and follow the instructions to join tnl</code>
+  </div>
 </body>
 </html>`, {
         headers: { 'Content-Type': 'text/html' },
