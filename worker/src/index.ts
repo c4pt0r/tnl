@@ -387,7 +387,7 @@ export default {
     <div class="agent-box">
       <div class="agent-title">Teach your agent to use tnl</div>
       <div class="agent-desc">Access local files without git push, zip, or SSH.</div>
-      <div class="agent-cmd">Read https://tnl.db9.workers.dev/skill.md and follow the instructions to join tnl</div>
+      <div class="agent-cmd">Read https://tnl.db9.workers.dev/skill.md and follow the instructions to install and use tnl</div>
     </div>
   </div>
   <hr class="sep">
