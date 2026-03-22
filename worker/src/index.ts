@@ -296,6 +296,18 @@ export default {
       });
     }
 
+    // Serve install.sh
+    if (url.pathname === '/install.sh') {
+      const installUrl = 'https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh';
+      const resp = await fetch(installUrl, { cf: { cacheTtl: 300 } });
+      if (!resp.ok) {
+        return new Response('Failed to fetch install.sh', { status: 502 });
+      }
+      return new Response(resp.body, {
+        headers: { 'Content-Type': 'text/x-shellscript; charset=utf-8' },
+      });
+    }
+
     // Landing page
     if (url.pathname === '/') {
       return new Response(`<!DOCTYPE html>
@@ -322,15 +334,16 @@ export default {
     .block { margin-bottom: 28px; }
     .label { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
     .term {
-      background: #111;
-      color: #ccc;
+      background: #f6f6f6;
+      color: #333;
       padding: 12px 16px;
       border-radius: 6px;
       overflow-x: auto;
+      border: 1px solid #eee;
     }
-    .term .ps { color: #666; user-select: none; -webkit-user-select: none; }
-    .term .cmd { color: #fff; }
-    .term .arg { color: #888; }
+    .term .ps { color: #aaa; user-select: none; -webkit-user-select: none; }
+    .term .cmd { color: #111; }
+    .term .arg { color: #666; }
     .agent-box {
       border: 1px solid #e0e0e0;
       border-radius: 6px;
@@ -362,7 +375,7 @@ export default {
   <hr class="sep">
   <div class="block">
     <div class="label">Quick Start</div>
-    <div class="term"><span class="ps">$ </span><span class="cmd">curl -fsSL</span> <span class="arg">https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh</span> <span class="cmd">| sh</span></div>
+    <div class="term"><span class="ps">$ </span><span class="cmd">curl -fsSL</span> <span class="arg">tnl.db9.workers.dev/install.sh</span> <span class="cmd">| sh</span></div>
   </div>
   <div class="block">
     <div class="label">Share</div>
