@@ -381,12 +381,6 @@ export default {
     <div class="label">Share</div>
     <div class="term"><span class="ps">$ </span><span class="cmd">tnl share</span> <span class="arg">./project</span></div>
   </div>
-  <div class="block">
-    <div class="label">Access</div>
-    <div class="term"><span class="ps">$ </span><span class="cmd">tnl ls</span> <span class="arg">AbC123deFg:/</span>
-<span class="ps">$ </span><span class="cmd">tnl cat</span> <span class="arg">AbC123deFg:/README.md</span>
-<span class="ps">$ </span><span class="cmd">tnl cp -r</span> <span class="arg">AbC123deFg:/ ./local</span></div>
-  </div>
   <hr class="sep">
   <div class="block">
     <div class="label">For AI Agents</div>
