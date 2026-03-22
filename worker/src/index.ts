@@ -305,52 +305,83 @@ export default {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tnl - Tunnel File Sharing</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      max-width: 600px;
-      margin: 100px auto;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 80px 24px 48px;
       text-align: center;
+      background: #fafafa;
+      color: #1a1a1a;
     }
-    h1 { font-size: 3em; margin-bottom: 0; }
-    .subtitle { color: #666; font-size: 1.2em; }
-    code { background: #f0f0f0; padding: 10px 15px; border-radius: 5px; display: inline-block; margin: 10px 0; }
-    a { color: #0066cc; }
+    h1 { font-size: 3.2em; margin: 0; letter-spacing: -0.02em; }
+    .subtitle { color: #666; font-size: 1.15em; margin: 8px 0 28px; }
+    .hero-code {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 14px 24px;
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.95em;
+      display: inline-block;
+      margin: 4px 0;
+    }
+    .hero-code .prompt { color: #888; }
     .onboard {
-      margin-top: 40px;
-      padding: 24px;
-      background: #f8f9fa;
+      margin-top: 36px;
+      padding: 28px;
+      background: #fff;
       border-radius: 12px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #e5e5e5;
       text-align: left;
     }
-    .onboard h2 { font-size: 1.2em; margin: 0 0 12px 0; }
-    .onboard p { color: #444; margin: 8px 0; line-height: 1.6; }
-    .onboard code {
+    .onboard h2 { font-size: 1.15em; margin: 0 0 10px 0; color: #1a1a1a; }
+    .onboard p { color: #555; margin: 6px 0 16px; line-height: 1.6; font-size: 0.95em; }
+    .onboard .agent-cmd {
       display: block;
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      padding: 12px 15px;
-      font-size: 0.9em;
-      text-align: left;
+      background: #f5f5f5;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85em;
+      color: #333;
+      line-height: 1.5;
       white-space: pre-wrap;
       word-break: break-all;
     }
+    .links {
+      margin-top: 28px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      font-size: 0.95em;
+    }
+    .links a {
+      color: #555;
+      text-decoration: none;
+      padding: 8px 0;
+      transition: color 0.15s;
+    }
+    .links a:hover { color: #0066cc; }
+    .links .sep { color: #ccc; }
   </style>
 </head>
 <body>
   <h1>📂 tnl</h1>
   <p class="subtitle">Tunnel-based ephemeral file sharing</p>
-  <p>Share files instantly from your terminal:</p>
-  <code>tnl share ./mydir</code>
-  <p style="margin-top: 30px;">
-    <a href="https://github.com/c4pt0r/tnl">GitHub</a> ·
-    <a href="https://github.com/c4pt0r/tnl/releases">Download CLI</a>
-  </p>
+  <p style="color:#888; margin-bottom:12px; font-size:0.95em;">Share files instantly from your terminal</p>
+  <div class="hero-code"><span class="prompt">$ </span>tnl share ./mydir</div>
   <div class="onboard">
     <h2>🤖 Send Your AI Agent to tnl</h2>
-    <p>Let your AI agent access your local files through tnl — no git push, no zip upload, no SSH needed.</p>
-    <code>Read https://tnl.db9.workers.dev/skill.md and follow the instructions to join tnl</code>
+    <p>Let your AI agent access your local files — no git push, no zip upload, no SSH needed.</p>
+    <code class="agent-cmd">Read https://tnl.db9.workers.dev/skill.md and follow the instructions to join tnl</code>
+  </div>
+  <div class="links">
+    <a href="https://github.com/c4pt0r/tnl">GitHub</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/c4pt0r/tnl/releases">Download CLI</a>
   </div>
 </body>
 </html>`, {
