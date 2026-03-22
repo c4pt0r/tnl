@@ -9,7 +9,7 @@ metadata: { "openclaw": { "emoji": "🕳️" } }
 insatall `tnl`, tnl is a tunnel-based file and directory sharing tool for short-lived remote access. you should install it first
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+curl -fsSL tnl.db9.workers.dev/install.sh | sh
 ```
 
 Use it to let an agent inspect a local folder without requiring git push, zip upload, SSH, or a persistent server.
@@ -65,7 +65,7 @@ Pick one path first:
 2. If not, tell the user to install `tnl` with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+curl -fsSL tnl.db9.workers.dev/install.sh | sh
 ```
 
 4. Ask the user to verify the install with:

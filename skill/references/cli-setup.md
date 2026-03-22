@@ -5,7 +5,7 @@
 Default install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | sh
+curl -fsSL tnl.db9.workers.dev/install.sh | sh
 ```
 
 This installer defaults to the nightly channel.
@@ -13,7 +13,7 @@ This installer defaults to the nightly channel.
 Install stable explicitly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/c4pt0r/tnl/master/install.sh | TNL_CHANNEL=stable sh
+curl -fsSL tnl.db9.workers.dev/install.sh | TNL_CHANNEL=stable sh
 ```
 
 Check installed version:
